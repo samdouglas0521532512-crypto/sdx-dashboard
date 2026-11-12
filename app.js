@@ -89,6 +89,16 @@
   // ---------- auth ----------
   var loginTab = "service";
   var eliteMode = "login";
+  var linkError = "";
+  (function () {
+    var h = location.hash + "&" + location.search;
+    var m = h.match(/error_description=([^&]+)/);
+    if (m) {
+      linkError = decodeURIComponent(m[1].replace(/\+/g, " "));
+      loginTab = "elite"; eliteMode = "setup";
+      history.replaceState(null, "", location.pathname);
+    }
+  })();
   function renderLogin(msg) {
     var svc = loginTab === "service";
     app.innerHTML =
@@ -112,7 +122,8 @@
             '<label class="field">Email<input class="input" id="email" type="email" required autocomplete="email" placeholder="you@email.com"></label>' +
             '<button class="btn btn-metal" type="submit">Email me a link</button></form>' +
             '<button class="btn btn-ghost" id="toLogin" type="button">Back to log in</button>')) +
-      '<div class="note" id="loginMsg">' + (msg ? esc(msg) : "") + "</div></div></div></div>";
+      '<div class="note" id="loginMsg">' + (msg ? esc(msg) : linkError ? esc("That email link did not work (" + linkError + "). Each link only works once. Ask for a new one below and use the newest email.") : "") + "</div></div></div></div>";
+    linkError = "";
     Array.prototype.forEach.call(document.querySelectorAll("[data-lt]"), function (b) { b.onclick = function () { loginTab = b.dataset.lt; renderLogin(); }; });
     if (svc) {
       var box = document.getElementById("tgWidget");
@@ -143,7 +154,17 @@
           out.textContent = "Sending…";
           try { localStorage.setItem("sdx_setpw", "1"); } catch (x) {}
           var res = await sb.auth.signInWithOtp({ email: document.getElementById("email").value.trim(), options: { emailRedirectTo: location.origin + location.pathname } });
-          out.textContent = res.error ? "Could not send the link: " + res.error.message : "Check your inbox and click the link. It can take a minute. You will then create your password.";
+          if (res.error) { out.textContent = "Could not send the email: " + res.error.message; return; }
+          var em = document.getElementById("email").value.trim();
+          out.innerHTML = 'Check your inbox. It can take a minute. Type the 6-digit code from the email below, or click the link in it.' +
+            '<form id="codeForm" style="display:flex;gap:8px;margin-top:12px"><input class="input" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="6-digit code" style="flex:1"><button class="btn btn-metal" type="submit">Continue</button></form><div id="codeMsg" style="margin-top:8px"></div>';
+          document.getElementById("codeForm").addEventListener("submit", async function (ev) {
+            ev.preventDefault();
+            var cm = document.getElementById("codeMsg");
+            cm.textContent = "Checking…";
+            var v = await sb.auth.verifyOtp({ email: em, token: document.getElementById("code").value.trim(), type: "email" });
+            cm.textContent = v.error ? "That code did not work: " + v.error.message + ". Ask for a new email and use the newest one." : "";
+          });
         });
       }
     }
