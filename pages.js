@@ -103,29 +103,50 @@
   };
 
   // ======================= EDUCATION =======================
-  // Add videos here: [title, short description, video link]. Leave the link "" to show "Coming soon".
+  // Add videos here: [title, short description, video file, length]. Leave the file "" to show "Coming soon".
+  // Video files sit next to index.html. A thumbnail with the same name (.jpg) is used automatically.
   var EDU = [
     ["EDUCATION", [
-      ["Welcome to the free trade service", "What you get and how it all works.", ""],
-      ["Broker setup & signal breakdown", "Setting up your broker and reading a signal.", ""],
-      ["Risk management", "How much to risk and keeping it the same every trade.", ""],
-      ["Understanding real trading vs fake", "What real trading results look like.", ""],
-      ["The trade tracker", "How every trade is tracked and what the numbers mean.", ""]
+      ["Welcome to the free trade service", "What you get and how it all works.", "01-welcome.mp4", "1:34"],
+      ["Broker setup & signal breakdown", "Setting up your broker and reading a signal.", "02-broker-setup.mp4", "1:52"],
+      ["Risk management", "How much to risk and keeping it the same every trade.", "03-risk-management.mp4", "3:54"],
+      ["Understanding real trading vs fake", "What real trading results look like.", "04-real-vs-fake.mp4", "1:29"],
+      ["The trade tracker", "How every trade is tracked and what the numbers mean.", "05-trade-tracker.mp4", "1:37"]
     ]]
   ];
   P.education = function (page) {
-    var total = 0, ready = 0;
-    EDU.forEach(function (g) { g[1].forEach(function (v) { total++; if (v[2]) ready++; }); });
+    var all = [];
+    EDU.forEach(function (g) { g[1].forEach(function (v) { all.push(v); }); });
+    var n = 0;
     page.innerHTML = '<section class="hero" style="min-height:190px"><div class="eyebrow">SD TRADING EDUCATION</div><h1>Education.</h1><div style="font-size:14px;color:#2a2c30">Videos on the trades sent out in the trade service.</div></section>' +
       EDU.map(function (g) {
         return '<div style="display:flex;flex-direction:column;gap:14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">' + g[0] + '</span><span class="muted" style="font-size:11px">' + g[1].length + (g[1].length === 1 ? " video" : " videos") + "</span></div>" +
           '<div class="grid-cards">' + g[1].map(function (v, i) {
-            var soon = !v[2];
-            return '<a class="card" ' + (soon ? 'href="javascript:void(0)"' : 'href="' + esc(v[2]) + '" target="_blank" rel="noopener"') + ' style="display:flex;flex-direction:column;color:#f4f4f5">' +
-              '<div class="vid"><span class="eyebrow" style="position:absolute;top:12px;left:14px">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</span><div class="play"' + (soon ? ' style="opacity:.45"' : "") + '><svg width="18" height="18" viewBox="0 0 24 24" fill="#0a0a0a"><polygon points="8 5 19 12 8 19"/></svg></div>' + (soon ? '<span class="muted" style="position:absolute;bottom:10px;right:14px;font-size:11px">Coming soon</span>' : "") + "</div>" +
+            var idx = n++, soon = !v[2], thumb = soon ? "" : v[2].replace(/\.mp4$/i, ".jpg");
+            return '<a class="card edu-card" href="javascript:void(0)"' + (soon ? "" : ' data-v="' + idx + '"') + ' style="display:flex;flex-direction:column;color:#f4f4f5">' +
+              '<div class="vid"' + (thumb ? ' style="background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.6)),url(\'' + esc(thumb) + '\') center/cover"' : "") + '><span class="eyebrow" style="position:absolute;top:12px;left:14px">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</span><div class="play"' + (soon ? ' style="opacity:.45"' : ' style="position:absolute;left:14px;bottom:10px;width:40px;height:40px"') + '><svg width="' + (soon ? 18 : 14) + '" height="' + (soon ? 18 : 14) + '" viewBox="0 0 24 24" fill="#0a0a0a"><polygon points="8 5 19 12 8 19"/></svg></div>' + (soon ? '<span class="muted" style="position:absolute;bottom:10px;right:14px;font-size:11px">Coming soon</span>' : (v[3] ? '<span class="mini" style="position:absolute;bottom:10px;right:14px;background:rgba(0,0,0,.6);color:#e6e8eb">' + esc(v[3]) + "</span>" : "")) + "</div>" +
               '<div style="padding:16px 18px;display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--sg);font-size:17px;font-weight:600">' + esc(v[0]) + '</span><span class="note" style="font-size:13px">' + esc(v[1]) + "</span></div></a>";
           }).join("") + "</div></div>";
-      }).join("");
+      }).join("") + '<div id="eduPlayer"></div>';
+
+    var holder = page.querySelector("#eduPlayer");
+    function close() { holder.innerHTML = ""; document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    function open(i) {
+      var v = all[i];
+      holder.innerHTML = '<div class="modal-wrap" id="eduWrap"><section class="modal" style="max-width:960px;padding:20px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div class="eyebrow">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</div><div style="font-family:var(--sg);font-size:20px;font-weight:600">' + esc(v[0]) + '</div></div><button class="x" id="eduClose" aria-label="Close">×</button></div>' +
+        '<video src="' + esc(v[2]) + '" poster="' + esc(v[2].replace(/\.mp4$/i, ".jpg")) + '" controls autoplay playsinline preload="metadata" controlsList="nodownload" disablePictureInPicture oncontextmenu="return false" style="width:100%;aspect-ratio:16/9;border-radius:12px;background:#000;display:block"></video>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+          (i > 0 ? '<button class="btn btn-ghost" data-go="' + (i - 1) + '">Previous</button>' : "<span></span>") +
+          (i < all.length - 1 && all[i + 1][2] ? '<button class="btn btn-metal" data-go="' + (i + 1) + '">Next video</button>' : "<span></span>") +
+        "</div></section></div>";
+      holder.querySelector("#eduClose").onclick = close;
+      holder.querySelector("#eduWrap").onclick = function (e) { if (e.target.id === "eduWrap") close(); };
+      holder.querySelectorAll("[data-go]").forEach(function (b) { b.onclick = function () { open(+b.getAttribute("data-go")); }; });
+      document.removeEventListener("keydown", onKey); document.addEventListener("keydown", onKey);
+    }
+    page.querySelectorAll(".edu-card[data-v]").forEach(function (c) { c.onclick = function () { open(+c.getAttribute("data-v")); }; });
   };
 
   // ======================= SOCIALS =======================
