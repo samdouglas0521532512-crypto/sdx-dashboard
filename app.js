@@ -52,6 +52,9 @@
     return tpl.innerHTML;
   }
   var ICON = {
+    scanners: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1"/>',
+    prep: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    progress: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
     dashboard: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
     service: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
     tracker: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
@@ -71,9 +74,9 @@
   };
   function svg(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + "</svg>"; }
   var NAV = [
-    ["WORKSPACE", [["dashboard", "Dashboard", "dashboard"], ["service", "Trade Service", "service"], ["live", "Live Sessions", "live"], ["results", "My Results", "results"], ["tracker", "Trade Tracker", "tracker"], ["breakdowns", "Trade Breakdowns", "breakdowns"], ["journal", "Journal", "journal"]]],
+    ["WORKSPACE", [["dashboard", "Dashboard", "dashboard"], ["prep", "Daily Prep", "prep"], ["progress", "My Progress", "progress"], ["service", "Trade Service", "service"], ["live", "Live Sessions", "live"], ["tracker", "Trade Tracker", "tracker"], ["breakdowns", "Trade Breakdowns", "breakdowns"], ["journal", "Journal", "journal"]]],
     ["LEARN", [["education", "Education", "education"], ["coach", "AI Coach", "coach"]]],
-    ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
+    ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["scanners", "Scanners", "scanners"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
     ["PARTNERS", [["brokers", "Brokers", "brokers"], ["edu", "Educational Platform", "edu", 0, C.ELITE_PACK_URL]]],
     ["HELP", [["support", "Support", "support"]]],
     ["ADMIN", [["admin", "Admin", "admin"]]]
@@ -253,8 +256,15 @@
     scrim.onclick = function () { side.classList.remove("open"); scrim.classList.remove("open"); };
     var page = document.getElementById("page");
     if (cur === "dashboard") renderDashboard(page);
+    else if (cur === "prep" && window.SDX_PREP) window.SDX_PREP(page, { elite: !free, name: state.member.name || "" });
+    else if (cur === "progress" && window.SDX_PROGRESS) window.SDX_PROGRESS(page, { elite: !free, name: state.member.name || "" });
     else if (cur === "service") renderService(page);
-    else if (cur === "tracker") renderTracker(page);
+    else if (cur === "tracker") {
+      var tsub = location.hash.replace(/^#\/?/, "").split("/")[1] === "mine" ? "mine" : "sdx";
+      page.innerHTML = '<div class="tabs" style="align-self:flex-start"><a class="tab' + (tsub === "sdx" ? " on" : "") + '" href="#/tracker" style="display:inline-flex;align-items:center;min-height:38px;font-size:13px">SDX Trade Tracker</a><a class="tab' + (tsub === "mine" ? " on" : "") + '" href="#/tracker/mine" style="display:inline-flex;align-items:center;min-height:38px;font-size:13px">My Trade Tracker</a></div><div id="tpage" style="display:flex;flex-direction:column;gap:26px"></div>';
+      var tp = document.getElementById("tpage");
+      if (tsub === "mine" && window.SDX_PAGES && window.SDX_PAGES.results) window.SDX_PAGES.results(tp); else renderTracker(tp);
+    }
     else if (window.SDX_PAGES && window.SDX_PAGES[cur]) window.SDX_PAGES[cur](page, location.hash.replace(/^#\/?/, "").split("/").slice(1));
     else page.innerHTML = '<div class="soon-page"><div class="eyebrow">COMING SOON</div><div class="title">On its <span class="metal-text">way.</span></div><div class="note">This section is being built.</div></div>';
   }
@@ -305,6 +315,7 @@
     var lv = liveNow();
     page.innerHTML = (lv ? liveBanner(lv) : "") +
       '<section class="hero"><img class="mark" src="' + LOGO + '" alt="" aria-hidden="true"><div class="eyebrow">SD TRADING EDUCATION</div><h1>Members dashboard.</h1></section>' + verifyCard() +
+      '<div id="homeW"></div>' +
       '<section class="card pad" style="display:flex;flex-direction:column;gap:18px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px"><div class="eyebrow">TRADE SERVICE RESULTS</div><div class="tabs">' + tabs + '</div></div>' +
       '<div class="tiles">' +
       tile("Trades sent", d[0]) + tile("Won", d[1], "pos") + tile("Lost", d[2], "neg") + tile("Breakeven", d[3]) + tile("Win rate", d[4]) + tile("Profit", d[5], pc) +
@@ -316,6 +327,7 @@
     page.querySelectorAll(".tab").forEach(function (b) { b.onclick = function () { state.period = b.dataset.p; renderShell(); }; });
     drawSessions();
     if (window.SDX_PAGES && window.SDX_PAGES.fillBalance) window.SDX_PAGES.fillBalance(document.getElementById("dashBal"));
+    if (window.SDX_HOME) window.SDX_HOME(document.getElementById("homeW"), { elite: !isFree(), name: state.member.name || "" });
   }
   function zoomLink(m) { var x = String(m.html || "").match(/https:\/\/[^"'<\s]*zoom\.us\/[^"'<\s]*/i) || String(m.plain || "").match(/https:\/\/\S*zoom\.us\/\S*/i); return x ? x[0].replace(/&amp;/g, "&") : null; }
   function isLive(m) { return m.kind === "live" || !!zoomLink(m); }
@@ -333,7 +345,7 @@
       '<div style="display:flex;align-items:center;gap:14px"><span style="width:44px;height:44px;border-radius:50%;background:var(--metal);display:flex;align-items:center;justify-content:center;flex:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg></span>' +
       '<div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-family:var(--sg);font-size:18px;font-weight:700">Account verification</span><span class="tag" style="background:' + (ok ? "rgba(127,217,154,.14);color:#7fd99a" : "rgba(255,159,67,.14);color:#ff9f43") + '">' + (ok ? "VERIFIED" : "PENDING") + '</span></div>' +
       '<div class="note" style="font-size:13px">Minimum account balance <b style="color:#fff">$500</b>. Support checks every Friday to make sure you are allowed to stay.</div></div></div>' +
-      '<div style="display:flex;align-items:center;gap:12px"><div style="text-align:right"><div class="eyebrow" style="font-size:9px">YOUR BALANCE</div><div id="dashBal" style="font-family:var(--sg);font-size:22px;font-weight:700">—</div></div><a class="btn btn-ghost" href="#/results" style="height:40px">Update</a></div></section>';
+      '<div style="display:flex;align-items:center;gap:12px"><div style="text-align:right"><div class="eyebrow" style="font-size:9px">YOUR BALANCE</div><div id="dashBal" style="font-family:var(--sg);font-size:22px;font-weight:700">—</div></div><a class="btn btn-ghost" href="#/tracker/mine" style="height:40px">Update</a></div></section>';
   }
   function tile(k, v, cls) { return '<div class="tile"><span class="k">' + k + '</span><span class="v ' + (cls || "") + '">' + esc(v) + "</span></div>"; }
   function drawSessions() {

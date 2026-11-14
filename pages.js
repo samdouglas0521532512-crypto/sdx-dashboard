@@ -114,39 +114,121 @@
       ["The trade tracker", "How every trade is tracked and what the numbers mean.", "05-trade-tracker.mp4", "1:37"]
     ]]
   ];
-  P.education = function (page) {
-    var all = [];
-    EDU.forEach(function (g) { g[1].forEach(function (v) { all.push(v); }); });
-    var n = 0;
-    page.innerHTML = '<section class="hero" style="min-height:190px"><div class="eyebrow">SD TRADING EDUCATION</div><h1>Education.</h1><div style="font-size:14px;color:#2a2c30">Videos on the trades sent out in the trade service.</div></section>' +
-      EDU.map(function (g) {
-        return '<div style="display:flex;flex-direction:column;gap:14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">' + g[0] + '</span><span class="muted" style="font-size:11px">' + g[1].length + (g[1].length === 1 ? " video" : " videos") + "</span></div>" +
-          '<div class="grid-cards">' + g[1].map(function (v, i) {
-            var idx = n++, soon = !v[2], thumb = soon ? "" : v[2].replace(/\.mp4$/i, ".jpg");
-            return '<a class="card edu-card" href="javascript:void(0)"' + (soon ? "" : ' data-v="' + idx + '"') + ' style="display:flex;flex-direction:column;color:#f4f4f5">' +
-              '<div class="vid"' + (thumb ? ' style="background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.6)),url(\'' + esc(thumb) + '\') center/cover"' : "") + '><span class="eyebrow" style="position:absolute;top:12px;left:14px">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</span><div class="play"' + (soon ? ' style="opacity:.45"' : ' style="position:absolute;left:14px;bottom:10px;width:40px;height:40px"') + '><svg width="' + (soon ? 18 : 14) + '" height="' + (soon ? 18 : 14) + '" viewBox="0 0 24 24" fill="#0a0a0a"><polygon points="8 5 19 12 8 19"/></svg></div>' + (soon ? '<span class="muted" style="position:absolute;bottom:10px;right:14px;font-size:11px">Coming soon</span>' : (v[3] ? '<span class="mini" style="position:absolute;bottom:10px;right:14px;background:rgba(0,0,0,.6);color:#e6e8eb">' + esc(v[3]) + "</span>" : "")) + "</div>" +
-              '<div style="padding:16px 18px;display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--sg);font-size:17px;font-weight:600">' + esc(v[0]) + '</span><span class="note" style="font-size:13px">' + esc(v[1]) + "</span></div></a>";
-          }).join("") + "</div></div>";
-      }).join("") + '<div id="eduPlayer"></div>';
-
-    var holder = page.querySelector("#eduPlayer");
-    function close() { holder.innerHTML = ""; document.removeEventListener("keydown", onKey); }
+  // ---- video progress (saved per student in journal_items, kind "video") ----
+  var VP = { rows: null };
+  function eduAll() { var a = []; EDU.forEach(function (g) { g[1].forEach(function (v) { if (v[2]) a.push(v); }); }); return a; }
+  function secs(t) { var p = String(t || "0:00").split(":"); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+  async function vpLoad() {
+    try { var r = await X().sb.from("journal_items").select("*").eq("kind", "video"); VP.rows = r.error ? [] : (r.data || []); }
+    catch (e) { VP.rows = []; }
+    return VP.rows;
+  }
+  function vpGet(file) { return (VP.rows || []).filter(function (r) { return r.data && r.data.v === file; })[0]; }
+  async function vpSave(file, patch) {
+    var row = vpGet(file), data = Object.assign({ v: file }, row ? row.data : {}, patch, { at: new Date().toISOString() });
+    if (row && row.data.done) data.done = true;
+    try {
+      if (row) { row.data = data; await X().sb.from("journal_items").update({ data: data, updated_at: data.at }).eq("id", row.id); }
+      else { var r = await X().sb.from("journal_items").insert({ user_id: (await X().sb.auth.getSession()).data.session.user.id, kind: "video", data: data }).select().single(); if (!r.error) VP.rows.push(r.data); }
+    } catch (e) { }
+  }
+  function vpStats() {
+    var all = eduAll(), done = all.filter(function (v) { var r = vpGet(v[2]); return r && r.data.done; });
+    var next = all.filter(function (v) { var r = vpGet(v[2]); return !(r && r.data.done); })[0] || null;
+    var last = (VP.rows || []).reduce(function (m, r) { return r.data && r.data.at > m ? r.data.at : m; }, "");
+    var left = all.filter(function (v) { var r = vpGet(v[2]); return !(r && r.data.done); }).reduce(function (a, v) { return a + secs(v[3]); }, 0);
+    return { all: all, total: all.length, done: done.length, next: next, nextIdx: next ? all.indexOf(next) : -1, last: last, leftMin: Math.max(1, Math.round(left / 60)) };
+  }
+  var MOTIVATE = [
+    "Small steps every day beat big steps once a month.",
+    "The traders who make it are the ones who keep learning.",
+    "Your future self will thank you for the work you put in today.",
+    "Discipline is doing it even when you don't feel like it.",
+    "Learn the process. The results follow.",
+    "Every pro was once a beginner who didn't quit.",
+    "Ten minutes of learning today is ten minutes ahead of everyone else."
+  ];
+  function motivation(st) {
+    var days = st.last ? Math.floor((Date.now() - new Date(st.last).getTime()) / 864e5) : null;
+    if (st.total && st.done >= st.total) return ["You've finished every video.", "Now put it into practice. Follow the trade service and log every trade you take."];
+    if (st.done === 0 && !st.last) return ["Start with the Welcome video.", "It's under 2 minutes and sets you up for everything else in the trade service."];
+    var head = st.total - st.done === 1 ? "One video left. Finish it today." : "You're " + (st.total - st.done) + " videos away from finishing.";
+    if (days != null && days >= 3) head = "You haven't watched a video in " + days + " days.";
+    return [head, MOTIVATE[Math.floor(Date.now() / 864e5) % MOTIVATE.length] + " About " + st.leftMin + " minute" + (st.leftMin === 1 ? "" : "s") + " of video left."];
+  }
+  function progressBar(p) { return '<div style="height:8px;border-radius:4px;background:#1a1a1c;overflow:hidden"><div style="height:100%;width:' + p + '%;background:var(--metal);transition:width .4s"></div></div>'; }
+  P.eduStats = function () { if (!VP.rows) return null; var st = vpStats(); return { done: st.done, total: st.total }; };
+  // Card for the dashboard home
+  P.eduCard = async function (el) {
+    if (!el) return;
+    await vpLoad(); var st = vpStats(); if (!st.total) { el.innerHTML = ""; return; }
+    var m = motivation(st), pct = Math.round(st.done / st.total * 100), fin = st.done >= st.total;
+    el.innerHTML = '<section class="card pad" style="display:flex;flex-direction:column;gap:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div class="eyebrow">YOUR EDUCATION</div><a href="#/education" class="muted" style="font-size:12px">All videos</a></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 280px"><div style="font:600 22px var(--sg)">' + esc(m[0]) + '</div><div class="note" style="font-size:13px">' + esc(m[1]) + '</div></div>' +
+      '<div style="text-align:right"><div style="font:700 34px var(--sg)">' + st.done + '<span class="muted" style="font-size:18px"> / ' + st.total + '</span></div><div class="muted" style="font-size:11px">videos completed</div></div></div>' + progressBar(pct) +
+      (fin ? "" : '<a class="btn btn-metal" href="#/education/' + st.nextIdx + '" style="align-self:flex-start">' + (st.done || st.last ? "Continue: " : "Start: ") + esc(st.next[0]) + "</a>") + "</section>";
+  };
+  P.education = async function (page, sub) {
+    var all = eduAll();
+    await vpLoad();
+    function draw() {
+      var st = vpStats(), pct = st.total ? Math.round(st.done / st.total * 100) : 0, m = motivation(st), n = 0;
+      page.innerHTML = '<section class="hero" style="min-height:190px"><div class="eyebrow">SD TRADING EDUCATION</div><h1>Education.</h1><div style="font-size:14px;color:#2a2c30">Videos on the trades sent out in the trade service.</div></section>' +
+        '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font:600 18px var(--sg)">' + esc(m[0]) + '</div><div class="note" style="font-size:13px">' + esc(m[1]) + '</div></div><div style="font:700 26px var(--sg)">' + st.done + '<span class="muted" style="font-size:15px"> / ' + st.total + " done</span></div></div>" + progressBar(pct) + "</section>" +
+        EDU.map(function (g) {
+          return '<div style="display:flex;flex-direction:column;gap:14px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">' + g[0] + '</span><span class="muted" style="font-size:11px">' + g[1].length + (g[1].length === 1 ? " video" : " videos") + "</span></div>" +
+            '<div class="grid-cards">' + g[1].map(function (v, i) {
+              var idx = v[2] ? n++ : -1, soon = !v[2], thumb = soon ? "" : v[2].replace(/\.mp4$/i, ".jpg"), row = soon ? null : vpGet(v[2]), done = row && row.data.done, part = row && !done && row.data.pos ? Math.min(95, Math.round(row.data.pos / Math.max(1, secs(v[3])) * 100)) : 0;
+              return '<a class="card edu-card" href="javascript:void(0)"' + (soon ? "" : ' data-v="' + idx + '"') + ' style="display:flex;flex-direction:column;color:#f4f4f5">' +
+                '<div class="vid"' + (thumb ? ' style="background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.6)),url(\'' + esc(thumb) + '\') center/cover"' : "") + '><span class="eyebrow" style="position:absolute;top:12px;left:14px">' + (i + 1 < 10 ? "0" : "") + (i + 1) + "</span>" +
+                (done ? '<span class="tag" style="position:absolute;top:10px;right:12px;background:rgba(127,217,154,.9);color:#0a0a0a">WATCHED</span>' : "") +
+                '<div class="play"' + (soon ? ' style="opacity:.45"' : ' style="position:absolute;left:14px;bottom:10px;width:40px;height:40px"') + '><svg width="' + (soon ? 18 : 14) + '" height="' + (soon ? 18 : 14) + '" viewBox="0 0 24 24" fill="#0a0a0a"><polygon points="8 5 19 12 8 19"/></svg></div>' +
+                (soon ? '<span class="muted" style="position:absolute;bottom:10px;right:14px;font-size:11px">Coming soon</span>' : (v[3] ? '<span class="mini" style="position:absolute;bottom:10px;right:14px;background:rgba(0,0,0,.6);color:#e6e8eb">' + esc(v[3]) + "</span>" : "")) +
+                (part ? '<div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.15)"><div style="height:100%;width:' + part + '%;background:#e6e8eb"></div></div>' : "") + "</div>" +
+                '<div style="padding:16px 18px;display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--sg);font-size:17px;font-weight:600">' + esc(v[0]) + '</span><span class="note" style="font-size:13px">' + esc(v[1]) + "</span>" + (part ? '<span class="muted" style="font-size:11px">' + part + "% watched</span>" : "") + "</div></a>";
+            }).join("") + "</div></div>";
+        }).join("") + '<div id="eduPlayer"></div>';
+      page.querySelectorAll(".edu-card[data-v]").forEach(function (c) { c.onclick = function () { open(+c.getAttribute("data-v")); }; });
+    }
+    var holder, cur = null;
+    function close() { if (holder) holder.innerHTML = ""; document.removeEventListener("keydown", onKey); cur = null; draw(); if (location.hash.split("/").length > 2) history.replaceState(null, "", "#/education"); }
     function onKey(e) { if (e.key === "Escape") close(); }
     function open(i) {
-      var v = all[i];
+      var v = all[i]; if (!v) return; cur = i;
+      holder = page.querySelector("#eduPlayer");
+      var row = vpGet(v[2]);
       holder.innerHTML = '<div class="modal-wrap" id="eduWrap"><section class="modal" style="max-width:960px;padding:20px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div class="eyebrow">' + (i + 1 < 10 ? "0" : "") + (i + 1) + '</div><div style="font-family:var(--sg);font-size:20px;font-weight:600">' + esc(v[0]) + '</div></div><button class="x" id="eduClose" aria-label="Close">×</button></div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div class="eyebrow">' + (i + 1 < 10 ? "0" : "") + (i + 1) + " of " + all.length + (row && row.data.done ? " · WATCHED" : "") + '</div><div style="font-family:var(--sg);font-size:20px;font-weight:600">' + esc(v[0]) + '</div></div><button class="x" id="eduClose" aria-label="Close">×</button></div>' +
         '<video src="' + esc(v[2]) + '" poster="' + esc(v[2].replace(/\.mp4$/i, ".jpg")) + '" controls autoplay playsinline preload="metadata" controlsList="nodownload" disablePictureInPicture oncontextmenu="return false" style="width:100%;aspect-ratio:16/9;border-radius:12px;background:#000;display:block"></video>' +
+        '<div id="eduDone" style="display:none;border-radius:12px;padding:14px 16px;background:rgba(127,217,154,.08);box-shadow:inset 0 0 0 1px rgba(127,217,154,.25);font-size:14px"></div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">' +
           (i > 0 ? '<button class="btn btn-ghost" data-go="' + (i - 1) + '">Previous</button>' : "<span></span>") +
-          (i < all.length - 1 && all[i + 1][2] ? '<button class="btn btn-metal" data-go="' + (i + 1) + '">Next video</button>' : "<span></span>") +
+          (i < all.length - 1 ? '<button class="btn btn-metal" data-go="' + (i + 1) + '">Next video</button>' : "<span></span>") +
         "</div></section></div>";
+      var vid = holder.querySelector("video"), lastSave = 0, marked = row && row.data.done;
+      if (row && !row.data.done && row.data.pos > 5) vid.addEventListener("loadedmetadata", function () { if (row.data.pos < vid.duration - 5) vid.currentTime = row.data.pos; }, { once: true });
+      function finish() {
+        if (marked) return; marked = true;
+        vpSave(v[2], { done: true, pos: 0 }).then(function () {
+          var st = vpStats(), box = holder.querySelector("#eduDone"); if (!box) return;
+          box.style.display = "";
+          box.innerHTML = st.done >= st.total ? "<b>That's every video done.</b> Now put it into practice in the trade service." : "<b>Nice one, that's " + st.done + " of " + st.total + " done.</b> " + (st.next ? "Up next: " + esc(st.next[0]) + "." : "");
+        });
+      }
+      vid.addEventListener("timeupdate", function () {
+        if (!vid.duration) return;
+        if (vid.currentTime / vid.duration >= 0.9) finish();
+        if (Date.now() - lastSave > 10000 && !marked) { lastSave = Date.now(); vpSave(v[2], { pos: Math.floor(vid.currentTime) }); }
+      });
+      vid.addEventListener("pause", function () { if (!marked && vid.currentTime > 3) vpSave(v[2], { pos: Math.floor(vid.currentTime) }); });
+      vid.addEventListener("ended", finish);
       holder.querySelector("#eduClose").onclick = close;
       holder.querySelector("#eduWrap").onclick = function (e) { if (e.target.id === "eduWrap") close(); };
       holder.querySelectorAll("[data-go]").forEach(function (b) { b.onclick = function () { open(+b.getAttribute("data-go")); }; });
       document.removeEventListener("keydown", onKey); document.addEventListener("keydown", onKey);
     }
-    page.querySelectorAll(".edu-card[data-v]").forEach(function (c) { c.onclick = function () { open(+c.getAttribute("data-v")); }; });
+    draw();
+    if (sub && sub[0] != null && sub[0] !== "" && !isNaN(+sub[0])) open(+sub[0]);
   };
 
   // ======================= SOCIALS =======================
@@ -510,6 +592,7 @@
         '<button class="btn btn-metal" id="saveT">Save trade</button><span class="muted" id="t_msg" style="font-size:12px"></span></section></div>';
     }
     page.innerHTML = html;
+    if (window.SDX_AI_BOX && !J.tradeFormOpen) window.SDX_AI_BOX(page, "tradejournal", "Trade Journal", "tradejournal", async function () { return T.slice(0, 80).map(function (t) { return "- " + (t.trade_date || "") + " | " + t.pair + " | " + (t.setup || "") + " | " + (t.side || "") + " | " + (t.session || "") + " | " + (t.result || "") + " " + (t.r != null ? t.r + "R" : "") + (t.notes ? " | " + String(t.notes).slice(0, 100) : ""); }).join("\n") || "(no trades)"; }, false);
     $("#newT", page).onclick = function () { J.tradeFormOpen = true; drawTradeJournal(page); };
     $$("[data-del]", page).forEach(function (b) { b.onclick = async function () { if (!confirm("Delete this trade?")) return; await X().sb.from("journal_trades").delete().eq("id", b.dataset.del); await loadTrades(); drawTradeJournal(page); }; });
     if (J.tradeFormOpen) {
@@ -526,7 +609,49 @@
   }
 
   // ---- entry model data ----
-  var BT_COLS = [["trade_date", "Date", "date"], ["session", "Session", ["London", "New York", "Asia"]], ["position", "Position", ["Long", "Short"]], ["result", "Status", ["Win", "Loss", "Breakeven"]], ["r", "R", "number"], ["poi", "POI", "text"], ["draw", "Liquidity draw", "text"], ["confluences", "Confluences", "text"], ["notes", "Entry notes", "text"]];
+  // Entry Model Data columns (same as the Notion DFX EM table). "pick" = a drop-down the student fills with their own options.
+  var BT_F = [["no", "Trade #", "text"], ["setup", "Setup", "pick"], ["r", "R", "number"], ["entry", "Entry", "pick"], ["position", "Position", ["", "LONG", "SHORT"]], ["opened", "Opened", "datetime"], ["closed", "Closed", "datetime"], ["confluences", "Confluences", "multi"], ["chart", "Files & media", "image"], ["poi", "What POI?", "pick"], ["draw", "What liquidity draw", "pick"], ["notes", "Text", "textarea"]];
+  function btOpts(k) { var seen = {}, out = []; (J.backtests || []).forEach(function (b) { var v = b.data && b.data[k]; (Array.isArray(v) ? v : [v]).forEach(function (x) { if (x && !seen[x]) { seen[x] = 1; out.push(x); } }); }); return out.sort(); }
+  function btWhen(d) { return d.opened || d.trade_date || ""; }
+  function btStatus(d) { var r = parseFloat(d.r); if (isNaN(r)) return d.result || ""; return r > 0 ? "Win" : r < 0 ? "Loss" : "Breakeven"; }
+  function btSession(d) { var o = d.opened || ""; if (o.length < 16) return d.session || ""; var h = +o.slice(11, 13); return h < 7 ? "Asia" : h < 12 ? "London" : h < 21 ? "New York" : "Asia"; }
+  function btDate(o) { return o ? new Date(o.length <= 10 ? o + "T12:00:00" : o) : null; }
+  var BT_COLS = [
+    ["no", "Trade #", function (d) { return '<b>' + esc(d.no || "") + "</b>"; }],
+    ["setup", "Setup", function (d) { return d.setup ? '<span class="mini" style="color:#e6e8eb">' + esc(d.setup) + "</span>" : ""; }],
+    ["r", "R", function (d) { return d.r == null || d.r === "" ? "" : '<b style="font-family:var(--sg)">' + esc(d.r) + "</b>"; }],
+    ["status", "Status", function (d) { var v = btStatus(d); if (!v) return ""; return '<span class="pill ' + (v === "Win" ? "win" : v === "Loss" ? "loss" : "be") + '">' + v + "</span>"; }],
+    ["entry", "Entry", function (d) { return esc(d.entry || ""); }],
+    ["position", "Position", function (d) { return d.position ? '<span class="mini" style="color:#e6e8eb">' + esc(d.position.toUpperCase()) + "</span>" : ""; }],
+    ["opened", "Opened", function (d) { var t = btDate(btWhen(d)); return t && !isNaN(t) ? t.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (btWhen(d).length > 10 ? ' <span class="muted">' + btWhen(d).slice(11, 16) + "</span>" : "") : ""; }],
+    ["closed", "Closed", function (d) { var t = btDate(d.closed); return t && !isNaN(t) ? t.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (d.closed.length > 10 ? ' <span class="muted">' + d.closed.slice(11, 16) + "</span>" : "") : ""; }],
+    ["hours", "Hours", function (d) { if (!d.opened || !d.closed) return ""; var h = (new Date(d.closed) - new Date(d.opened)) / 36e5; return h >= 0 ? h.toFixed(1) : ""; }],
+    ["day", "Day", function (d) { var t = btDate(btWhen(d)); return t && !isNaN(t) ? t.toLocaleDateString("en-GB", { weekday: "long" }) : ""; }],
+    ["month", "Month", function (d) { var t = btDate(btWhen(d)); return t && !isNaN(t) ? t.toLocaleDateString("en-GB", { month: "long" }) : ""; }],
+    ["year", "Year", function (d) { var t = btDate(btWhen(d)); return t && !isNaN(t) ? t.getFullYear() : ""; }],
+    ["session", "Session", function (d) { return esc(btSession(d)); }],
+    ["confluences", "Confluences", function (d) { var c = Array.isArray(d.confluences) ? d.confluences : (d.confluences ? String(d.confluences).split(/\s*,\s*/) : []); return '<div style="display:flex;flex-wrap:wrap;gap:4px;min-width:180px">' + c.filter(Boolean).map(function (x) { return '<span class="mini" style="color:#e6e8eb">' + esc(x) + "</span>"; }).join("") + "</div>"; }],
+    ["chart", "Files & media", function (d) { return d.chart ? '<a href="' + esc(d.chart) + '" target="_blank" rel="noopener"><img src="' + esc(d.chart) + '" alt="" style="width:56px;height:34px;object-fit:cover;border-radius:4px;display:block"></a>' : ""; }],
+    ["poi", "What POI?", function (d) { return esc(d.poi || ""); }],
+    ["draw", "What liquidity draw", function (d) { return esc(d.draw || ""); }],
+    ["notes", "Text", function (d) { return '<span style="display:block;max-width:220px;white-space:normal">' + esc(d.notes || "") + "</span>"; }]
+  ];
+  function btInput(f, v) {
+    var k = f[0], label = f[1], t = f[2];
+    if (Array.isArray(t)) return '<label class="field">' + label + '<select class="input" data-bt="' + k + '">' + t.map(function (o) { return '<option value="' + o + '"' + (String(v || "").toUpperCase() === o ? " selected" : "") + ">" + (o || "Choose") + "</option>"; }).join("") + "</select></label>";
+    if (t === "pick") {
+      var opts = btOpts(k);
+      return '<div class="field">' + label + '<select class="input" data-bt="' + k + '" data-pick="' + k + '"><option value="">Choose</option>' + opts.map(function (o) { return '<option' + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + '<option value="__new">+ New option</option></select><input class="input" data-pnew="' + k + '" placeholder="Type the new option" style="display:none;height:42px"></div>';
+    }
+    if (t === "multi") {
+      var on = Array.isArray(v) ? v : (v ? String(v).split(/\s*,\s*/) : []), all = btOpts(k);
+      on.forEach(function (x) { if (x && all.indexOf(x) < 0) all.push(x); });
+      return '<div class="field wide">' + label + '<div class="chips" data-multi="' + k + '">' + all.map(function (o) { return '<button type="button" class="chip' + (on.indexOf(o) > -1 ? " on" : "") + '" data-o="' + esc(o) + '">' + esc(o) + "</button>"; }).join("") + '</div><div style="display:flex;gap:8px"><input class="input" data-newtag="' + k + '" placeholder="Add your own" style="height:40px"><button type="button" class="btn btn-ghost" data-addtag="' + k + '" style="height:40px">Add</button></div></div>';
+    }
+    if (t === "image") return '<div class="field wide">' + label + (v ? '<img src="' + esc(v) + '" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px">' : "") + '<div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn btn-ghost" style="cursor:pointer;height:40px">' + (v ? "Change image" : "Upload image") + '<input type="file" accept="image/*" data-btimg="' + k + '" hidden></label><input class="input" data-bt="' + k + '" value="' + esc(v || "") + '" placeholder="or paste an image link" style="height:40px;flex:1;min-width:160px"></div></div>';
+    if (t === "textarea") return '<label class="field wide">' + label + '<textarea class="input" data-bt="' + k + '" rows="3" style="height:auto;padding:12px;line-height:1.6">' + esc(v || "") + "</textarea></label>";
+    return '<label class="field">' + label + '<input class="input" data-bt="' + k + '" type="' + (t === "datetime" ? "datetime-local" : t === "number" ? "number" : "text") + '"' + (t === "number" ? ' step="any"' : "") + ' value="' + esc(v == null ? "" : v) + '"></label>';
+  }
   async function entryData(page) {
     page.innerHTML = crumb("Entry Model Data") + '<div class="note">Loading…</div>';
     var r = await X().sb.from("backtests").select("*").order("created_at", { ascending: true });
@@ -544,21 +669,22 @@
         '<div class="tabs" style="align-self:flex-start">' + models.map(function (m) { return '<button class="tab' + (m === J.edm ? " on" : "") + '" data-md="' + m + '" style="min-height:40px;padding:0 16px;font-size:13px">' + m + "</button>"; }).join("") + "</div>" +
         (pairs.length ? '<div class="grid-cards">' + pairs.map(function (p) {
           var rows = mine.filter(function (b) { return b.pair === p && b.data && b.data.r !== undefined; });
-          var w = rows.filter(function (b) { return b.data.result === "Win"; }).length, tot = rows.reduce(function (a, b) { return a + (parseFloat(b.data.r) || 0); }, 0);
+          var w = rows.filter(function (b) { return btStatus(b.data) === "Win"; }).length, tot = rows.reduce(function (a, b) { return a + (parseFloat(b.data.r) || 0); }, 0);
           return '<button class="card pad" data-pair="' + esc(p) + '" style="text-align:left;border:none;cursor:pointer;color:#f4f4f5;display:flex;flex-direction:column;gap:12px;min-height:110px"><span style="font-family:var(--sg);font-size:19px;font-weight:600">' + esc(p) + '</span><span class="muted" style="font-size:12px">' + rows.length + " trades · " + (rows.length ? Math.round(w / rows.length * 100) : 0) + "% win · " + (tot > 0 ? "+" : "") + tot.toFixed(1) + "R</span></button>";
         }).join("") + "</div>" : '<div class="card pad" style="text-align:center;padding:50px"><div style="font-family:var(--sg);font-size:20px;font-weight:600">No pairs yet</div><div class="note" style="margin-top:6px">Add the pairs you backtest this model on. Each pair gets its own table.</div></div>');
     } else {
       var rows = mine.filter(function (b) { return b.pair === J.edPair && b.data && b.data.r !== undefined; });
-      var w = rows.filter(function (b) { return b.data.result === "Win"; }).length, tot = rows.reduce(function (a, b) { return a + (parseFloat(b.data.r) || 0); }, 0);
+      var w = rows.filter(function (b) { return btStatus(b.data) === "Win"; }).length, tot = rows.reduce(function (a, b) { return a + (parseFloat(b.data.r) || 0); }, 0);
       html += '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px"><div style="display:flex;flex-direction:column;gap:8px"><button class="chip" id="backList" style="align-self:flex-start">← ' + esc(J.edm) + '</button><h1 class="title">' + esc(J.edPair) + '</h1></div><div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn btn-ghost" style="cursor:pointer">Import CSV<input type="file" accept=".csv" id="csv" style="display:none"></label><button class="btn btn-metal" id="addBt">Add trade</button></div></div>' +
         '<div class="tiles" style="padding:6px 0;border-bottom:1px solid #18181a">' + tileH("Trades", rows.length) + tileH("Win rate", rows.length ? Math.round(w / rows.length * 100) + "%" : "0%") + tileH("Total R", (tot > 0 ? "+" : "") + tot.toFixed(1) + "R", tot > 0 ? "pos" : tot < 0 ? "neg" : "") + tileH("Average R", rows.length ? (tot / rows.length).toFixed(2) + "R" : "0R") + "</div>" +
-        '<section class="card"><div class="scroll-x"><table style="min-width:980px"><thead><tr style="background:#0c0c0d">' + BT_COLS.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "<th></th></tr></thead><tbody>" +
-        rows.slice().reverse().map(function (b) { return "<tr>" + BT_COLS.map(function (c) { var v = b.data[c[0]]; if (c[0] === "result") { var k = v === "Win" ? "win" : v === "Loss" ? "loss" : "be"; return '<td><span class="pill ' + k + '">' + esc(v || "") + "</span></td>"; } return '<td style="color:#c9ccd1">' + esc(v == null ? "" : v) + "</td>"; }).join("") + '<td><button class="chip" data-delbt="' + b.id + '" style="min-height:30px">Delete</button></td></tr>'; }).join("") +
-        "</tbody></table></div>" + (rows.length ? "" : '<div class="note" style="padding:36px;text-align:center">No trades yet. Click Add trade or import a CSV.</div>') + "</section>";
+        '<section class="card"><div class="scroll-x"><table style="min-width:1900px"><thead><tr style="background:#0c0c0d">' + BT_COLS.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        rows.slice().reverse().map(function (b) { return '<tr data-edbt="' + b.id + '" style="cursor:pointer">' + BT_COLS.map(function (c) { return '<td style="color:#c9ccd1;white-space:nowrap">' + c[2](b.data || {}) + "</td>"; }).join("") + "</tr>"; }).join("") +
+        "</tbody></table></div>" + (rows.length ? "" : '<div class="note" style="padding:36px;text-align:center">No trades yet. Click Add trade or import a CSV.</div>') + "</section>" + (rows.length ? '<div class="note" style="font-size:12px;margin-top:-14px">Tap a trade to edit it. Status, hours, day, month, year and session fill in by themselves.</div>' : "");
       if (J.btForm) {
-        html += '<div class="panel-wrap"><section class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:var(--sg);font-size:22px;font-weight:600">Add trade · ' + esc(J.edPair) + '</div><button class="x" id="closeBt">×</button></div><div class="form-grid">' +
-          BT_COLS.map(function (c) { var wide = ["confluences", "notes", "draw"].indexOf(c[0]) > -1 ? " wide" : ""; if (Array.isArray(c[2])) return '<label class="field' + wide + '">' + c[1] + '<select class="input" data-bt="' + c[0] + '">' + c[2].map(function (o) { return "<option>" + o + "</option>"; }).join("") + "</select></label>"; return '<label class="field' + wide + '">' + c[1] + '<input class="input" data-bt="' + c[0] + '" type="' + (c[2] === "date" ? "date" : c[2] === "number" ? "number" : "text") + '" step="0.1"></label>'; }).join("") +
-          '</div><button class="btn btn-metal" id="saveBt">Save trade</button><span class="muted" id="bt_msg" style="font-size:12px"></span></section></div>';
+        var ed = J.btForm === true ? null : J.backtests.filter(function (b) { return b.id === J.btForm; })[0], dv = ed ? ed.data : {};
+        html += '<div class="panel-wrap"><section class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:var(--sg);font-size:22px;font-weight:600">' + (ed ? "Edit trade" : "Add trade") + " · " + esc(J.edPair) + '</div><button class="x" id="closeBt">×</button></div><div class="form-grid" id="btForm">' +
+          BT_F.map(function (f) { return btInput(f, dv[f[0]]); }).join("") +
+          '</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-metal" id="saveBt">Save trade</button>' + (ed ? '<button class="btn btn-ghost" id="delBt" style="color:#ff8a8a;border-color:#3a1c1c">Delete</button>' : "") + '</div><span class="muted" id="bt_msg" style="font-size:12px"></span></section></div>';
       }
     }
     if (J.pickerOpen) {
@@ -570,18 +696,54 @@
         '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #1a1a1c;padding-top:10px"><span class="muted" style="font-size:12px">' + (Object.keys(J.picked).length || "Pick one or more") + (Object.keys(J.picked).length ? " selected" : "") + '</span><button class="btn btn-metal" id="confirmP">Add to model</button></div></section></div>';
     }
     page.innerHTML = html;
+    if (window.SDX_AI_BOX && !J.btForm && !J.pickerOpen) {
+      var edKey = "ed:" + J.edm + (J.edPair ? ":" + J.edPair : ""), edTitle = "Entry Model Data · " + J.edm + (J.edPair ? " · " + J.edPair : "");
+      window.SDX_AI_BOX(page, edKey, edTitle, "entrydata", async function () {
+        var rs = mine.filter(function (b) { return (!J.edPair || b.pair === J.edPair) && b.data && b.data.r !== undefined && b.data.r !== ""; });
+        return rs.length + " backtested trades.\n" + rs.slice(-80).map(function (b) { var d = b.data; return "- " + b.pair + " | " + (d.setup || "") + " | " + d.r + "R " + btStatus(d) + " | " + (d.position || "") + " | " + (btSession(d) || "") + " | " + (btWhen(d) ? new Date(btWhen(d)).toLocaleDateString("en-GB", { weekday: "short" }) : "") + " | entry " + (d.entry || "") + " | conf " + (Array.isArray(d.confluences) ? d.confluences.join(", ") : d.confluences || "") + " | POI " + (d.poi || "") + " | draw " + (d.draw || "") + (d.notes ? " | " + String(d.notes).slice(0, 100) : ""); }).join("\n");
+      }, false);
+    }
     $$("[data-md]", page).forEach(function (b) { b.onclick = function () { J.edm = b.dataset.md; drawEntryData(page); }; });
     $$("[data-pair]", page).forEach(function (b) { b.onclick = function () { J.edPair = b.dataset.pair; drawEntryData(page); }; });
     var ap = $("#addPair", page); if (ap) ap.onclick = function () { J.pickerOpen = true; J.picked = {}; drawEntryData(page); };
     var bl = $("#backList", page); if (bl) bl.onclick = function () { J.edPair = null; drawEntryData(page); };
     var ab = $("#addBt", page); if (ab) ab.onclick = function () { J.btForm = true; drawEntryData(page); };
     var cb = $("#closeBt", page); if (cb) cb.onclick = function () { J.btForm = false; drawEntryData(page); };
-    $$("[data-delbt]", page).forEach(function (b) { b.onclick = async function () { if (!confirm("Delete this trade?")) return; await X().sb.from("backtests").delete().eq("id", b.dataset.delbt); await loadBacktests(); drawEntryData(page); }; });
+    $$("[data-edbt]", page).forEach(function (tr) { tr.onclick = function (e) { if (e.target.closest("a")) return; J.btForm = tr.dataset.edbt; drawEntryData(page); }; });
+    var fm = $("#btForm", page);
+    if (fm) {
+      $$("[data-pick]", fm).forEach(function (sel) { sel.onchange = function () { var n = $('[data-pnew="' + sel.dataset.pick + '"]', fm); n.style.display = sel.value === "__new" ? "" : "none"; if (sel.value === "__new") n.focus(); }; });
+      $$("[data-multi] .chip", fm).forEach(function (c) { c.onclick = function () { c.classList.toggle("on"); }; });
+      $$("[data-addtag]", fm).forEach(function (b) {
+        var k = b.dataset.addtag, inp = $('[data-newtag="' + k + '"]', fm);
+        var go = function () { var v = inp.value.trim(); if (!v) return; var c = document.createElement("button"); c.type = "button"; c.className = "chip on"; c.dataset.o = v; c.textContent = v; c.onclick = function () { c.classList.toggle("on"); }; $('[data-multi="' + k + '"]', fm).appendChild(c); inp.value = ""; };
+        b.onclick = go; inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); go(); } };
+      });
+      $$("[data-btimg]", fm).forEach(function (inp) {
+        inp.onchange = async function () {
+          var f = inp.files && inp.files[0]; if (!f) return;
+          if (!window.SDX_UPLOAD) { $("#bt_msg", page).textContent = "Image uploads aren't switched on yet."; return; }
+          $("#bt_msg", page).textContent = "Uploading…";
+          try { $('[data-bt="' + inp.dataset.btimg + '"]', fm).value = await window.SDX_UPLOAD(f); $("#bt_msg", page).textContent = "Image added. Tap Save trade."; } catch (e) { $("#bt_msg", page).textContent = "Couldn't upload: " + (e.message || e); }
+        };
+      });
+    }
+    var db2 = $("#delBt", page); if (db2) db2.onclick = async function () { if (!confirm("Delete this trade?")) return; await X().sb.from("backtests").delete().eq("id", J.btForm); J.btForm = false; await loadBacktests(); drawEntryData(page); };
     var sb2 = $("#saveBt", page);
     if (sb2) sb2.onclick = async function () {
-      var data = {}; $$("[data-bt]", page).forEach(function (i) { data[i.dataset.bt] = i.value; });
+      var data = {};
+      BT_F.forEach(function (f) {
+        var k = f[0];
+        if (f[2] === "multi") { data[k] = $$('[data-multi="' + k + '"] .chip.on', fm).map(function (c) { return c.dataset.o; }); return; }
+        var el = $('[data-bt="' + k + '"]', fm); if (!el) return;
+        var v = el.value;
+        if (f[2] === "pick" && v === "__new") v = $('[data-pnew="' + k + '"]', fm).value.trim();
+        data[k] = v;
+      });
       if (data.r === "") { $("#bt_msg", page).textContent = "Add the R."; return; }
-      var r = await X().sb.from("backtests").insert({ user_id: await uid(), model: J.edm, pair: J.edPair, data: data });
+      var r;
+      if (J.btForm === true) r = await X().sb.from("backtests").insert({ user_id: await uid(), model: J.edm, pair: J.edPair, data: data });
+      else r = await X().sb.from("backtests").update({ data: data }).eq("id", J.btForm);
       if (r.error) { $("#bt_msg", page).textContent = "Couldn't save: " + r.error.message; return; }
       J.btForm = false; await loadBacktests(); drawEntryData(page);
     };
@@ -595,9 +757,9 @@
         var split = function (l) { var out = [], cur = "", q = false; for (var i = 0; i < l.length; i++) { var ch = l[i]; if (ch === '"') q = !q; else if (ch === "," && !q) { out.push(cur.trim()); cur = ""; } else cur += ch; } out.push(cur.trim()); return out; };
         var hd = split(lines[0]).map(function (h) { return h.toLowerCase(); });
         var find = function (names) { for (var i = 0; i < names.length; i++) { var k = hd.indexOf(names[i]); if (k > -1) return k; } return -1; };
-        var map = { trade_date: find(["date", "opened", "month"]), session: find(["session"]), position: find(["position", "side"]), result: find(["status", "result", "w/l"]), r: find(["r", "rr"]), poi: find(["what poi?", "poi"]), draw: find(["what liquidity draw", "liquidity draw", "target"]), confluences: find(["confluences"]), notes: find(["entry", "notes"]) };
+        var map = { no: find(["trade #", "trade", "#"]), setup: find(["setup"]), r: find(["r", "rr"]), result: find(["status", "result", "w/l"]), entry: find(["entry"]), position: find(["position", "side"]), opened: find(["opened", "date"]), closed: find(["closed"]), session: find(["session"]), confluences: find(["confluences"]), poi: find(["what poi?", "poi"]), draw: find(["what liquidity draw", "liquidity draw", "target"]), notes: find(["text", "notes"]) };
         var id = await uid();
-        var rows = lines.slice(1).map(function (l) { var v = split(l), d = {}; Object.keys(map).forEach(function (k) { d[k] = map[k] > -1 ? (v[map[k]] || "") : ""; }); return { user_id: id, model: J.edm, pair: J.edPair, data: d }; });
+        var rows = lines.slice(1).map(function (l) { var v = split(l), d = {}; Object.keys(map).forEach(function (k) { d[k] = map[k] > -1 ? (v[map[k]] || "") : ""; }); if (d.confluences) d.confluences = d.confluences.split(/\s*,\s*/).filter(Boolean); if (d.opened && !isNaN(new Date(d.opened))) { var od = new Date(d.opened); d.opened = new Date(od.getTime() - od.getTimezoneOffset() * 6e4).toISOString().slice(0, 16); } if (d.closed && !isNaN(new Date(d.closed))) { var cd = new Date(d.closed); d.closed = new Date(cd.getTime() - cd.getTimezoneOffset() * 6e4).toISOString().slice(0, 16); } return { user_id: id, model: J.edm, pair: J.edPair, data: d }; });
         await X().sb.from("backtests").insert(rows);
         await loadBacktests(); drawEntryData(page);
       };
