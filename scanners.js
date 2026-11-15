@@ -24,7 +24,7 @@
       chart: { title: "TREND", dir: "buy", box: "", check: ["15M trend", "5M agrees", "1M agrees", "Signal", "TP1 hit"] }
     },
     {
-      id: "titanium", name: "SDX Fortress", tag: "SMC SUPPLY & DEMAND", status: "live", tf: "M1, M5 and M15",
+      id: "titanium", name: "SDX Precision", tag: "SMC SUPPLY & DEMAND", status: "live", tf: "M1, M5 and M15",
       line: "Full smart money indicator. Sets an entry on every supply and demand zone and keeps them on the chart until they are used, without cramming it.",
       shows: ["Supply and demand zones with entries set", "Trend for M1, M5 and M15", "Zones stay valid until price uses them", "Entry, SL and TP on every zone"],
       how: ["Check the trend on M1, M5 and M15.", "Only take sells from supply when all three are bearish.", "Only take buys from demand when all three are bullish.", "If the timeframes don't agree, leave it."],
@@ -45,11 +45,11 @@
       chart: { title: "SESSION SWEEP", dir: "sell", box: "SESSION", check: ["Session sweep", "Into POI", "M5 MSS", "0.5 pullback", "Entry"] }
     },
     {
-      id: "iridium", name: "SDX Leviathan", tag: "INSTITUTIONAL ORDER FLOW", status: "soon", tf: "Coming soon",
-      line: "Follows institutional order flow so you can see which side the big money is on. More details when it launches.",
-      shows: ["Order flow direction", "Key institutional levels", "Buy and Sell signals with SL and TP"],
-      how: ["Full guide coming when the scanner launches."],
-      chart: { title: "ORDER FLOW", dir: "buy", box: "ORDER FLOW", check: ["Flow bullish", "Key level", "Reaction", "Confirmation", "Entry"] }
+      id: "iridium", name: "SDX Ghost", tag: "INSTITUTIONAL ORDER FLOW", status: "live", tf: "M1 chart, M5 zones",
+      line: "Follows institutional order flow. Marks up close and down close zones on M1 to H4, labelled by timeframe, and only trades M5 zones when M1, M5 and M15 order flow all agree.",
+      shows: ["Down close and up close zones on M1, M5, M15, H1 and H4, each labelled with its timeframe", "H1 and H4 FVGs", "Order flow table: bullish or bearish on M1 to H4", "BUY NOW / SELL NOW when price is already at the zone, BUY LIMIT / SELL LIMIT when it has to come back", "Entry, SL and TP lines, with past trades marked by small arrows"],
+      how: ["Check the table. M1, M5 and M15 all bullish means buys only. All bearish means sells only. Mixed means no trades.", "The entry is the 50% of the nearest M5 zone.", "If price is already within 5 pips of it, the scanner sends a NOW trade. If not, it sets a limit.", "SL is 60 pips. TP is 2R. At 20 pips in profit, move the SL to entry.", "If the scanner cancels a limit, delete it."],
+      chart: { title: "ORDER FLOW", dir: "buy", box: "M5 DOWN CLOSE", check: ["M1 bullish", "M5 bullish", "M15 bullish", "M5 zone", "Entry set"] }
     }
   ];
 
