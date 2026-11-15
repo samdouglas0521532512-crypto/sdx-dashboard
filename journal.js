@@ -122,8 +122,8 @@
     var out = [
       ["PLANNING", plans.concat([L("+ New plan", "#/journal/newplan"), L("Setups", "#/journal/setups"), d("checklist", "Check list"), d("risk", "Risk Management Plan"), L("Scaling Roadmap", "#/journal/t/scaling")])],
       ["DATA", [L("Entry Model Data", "#/journal/data"), L("Pre Session TA", "#/journal/t/presession"), L("Mech Model", "#/journal/t/mech"), L("Futures Journal", "#/journal/t/futures"), L("Funded Accounts", "#/journal/funded")]],
-      ["JOURNAL", [L("AI Review", "#/journal/ai"), L("Signal Journal", "#/tracker/mine"), L("Trade Journal", "#/journal/trades"), L("Account Progress", "#/journal/t/progress"), L("Live Trades", "#/journal/t/live")]],
-      ["TRADING TOOLS", [d("course", "Course Notes"), L("Books", "#/journal/t/books"), d("broker", "Broker"), d("habits", "Habit Tracker")]],
+      ["JOURNAL", [L("AI Review", "#/journal/ai"), L("Signal Journal", "#/tracker/mine"), L("Trade Journal", "#/journal/trades"), L("Account Progress", "#/journal/t/progress"), L("Live Trades", "#/journal/t/live"), L("Trade Gallery", "#/journal/gallery")]],
+      ["TRADING TOOLS", [d("course", "Course Notes"), L("Books", "#/journal/t/books"), d("broker", "Broker"), L("Habit Tracker", "#/journal/habits")]],
       ["GOALS", [d("goals", "Goals Annually"), d("goalsyear", "Goals"), L("Monthly Reviews", "#/journal/reviews/monthly"), L("Weekly Reviews", "#/journal/reviews/weekly")]],
       ["TRADING", [d("pairs", "Currency Pairs"), L("Pips", "#/journal/pips"), L("Drawdown Recovery Rate", "#/journal/drawdown")]],
       ["HEALTH & FITNESS", [d("gym", "Gym Plan"), d("cardio", "Cardio Plan"), d("meals", "Meal Planner")]],
@@ -133,43 +133,276 @@
     out.forEach(function (sec, i) { if (i < 7) sec[1] = sec[1].concat(i === 0 ? mine(sec[0]).filter(function (x) { return x[0] !== "+ Add page"; }) : mine(sec[0])); });
     return out;
   }
+  var SEC_INFO = {
+    "PLANNING": "How you trade. Your plans, setups and rules.",
+    "DATA": "Backtests and analysis that prove your edge.",
+    "JOURNAL": "Every trade you take, and how you are doing.",
+    "TRADING TOOLS": "Notes, books, broker and your daily habits.",
+    "GOALS": "Where you are going, and your reviews.",
+    "TRADING": "Pairs you trade and quick reference pages.",
+    "HEALTH & FITNESS": "Look after the trader as well as the account.",
+    "TRADING ESSENTIALS": "Tools you will use every day.",
+    "FUNDED DISCOUNTS": "Deals on prop firm accounts."
+  };
   function sectionCard(sec) {
-    return '<section class="card" style="padding:18px 16px 10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span class="eyebrow">' + sec[0] + '</span><span class="muted" style="font-size:10px">' + (sec[1].length < 10 ? "0" : "") + sec[1].length + "</span></div>" +
-      sec[1].map(function (it) {
+    var items = sec[1].filter(function (it) { return !/^\+ /.test(it[0]); }), adds = sec[1].filter(function (it) { return /^\+ /.test(it[0]); });
+    return '<section class="card jsec"><div class="jsec-h"><div><div class="jsec-t">' + esc(sec[0].charAt(0) + sec[0].slice(1).toLowerCase()) + '</div><div class="jsec-d">' + esc(SEC_INFO[sec[0]] || "") + '</div></div><span class="jsec-n">' + items.length + "</span></div>" +
+      '<div class="jsec-l">' + items.map(function (it) {
         var ext = it[2], dead = it[1] === "javascript:void(0)";
-        return '<a class="list-link" href="' + esc(it[1]) + '"' + (ext ? ' target="_blank" rel="noopener"' : "") + '><span>' + esc(it[0]) + '</span><span class="mini">' + (dead ? "SOON" : ext ? "LINK" : /^\+ /.test(it[0]) ? "NEW" : "OPEN") + "</span></a>";
-      }).join("") + "</section>";
+        return '<a class="jrow' + (dead ? " dead" : "") + '" href="' + esc(it[1]) + '"' + (ext ? ' target="_blank" rel="noopener"' : "") + "><span>" + esc(it[0]) + '</span><span class="jarrow">' + (dead ? "SOON" : ext ? "↗" : "›") + "</span></a>";
+      }).join("") + "</div>" +
+      (adds.length ? '<div class="jsec-a">' + adds.map(function (it) { return '<a class="chip" href="' + esc(it[1]) + '">' + esc(it[0]) + "</a>"; }).join("") + "</div>" : "") + "</section>";
   }
-  function monthStats() {
-    var m = todayUK().slice(0, 7);
-    var T = (D.trades || []).filter(function (t) { return (t.trade_date || "").slice(0, 7) === m; });
-    var wins = T.filter(function (t) { return t.result === "Win"; }).length, tot = T.reduce(function (a, t) { return a + (Number(t.r) || 0); }, 0);
-    return { n: T.length, wr: T.length ? Math.round(wins / T.length * 100) : 0, r: tot };
+
+  // ======================= OVERVIEW (journal home) =======================
+  var OV = { src: "mine", month: null, data: null };
+  var SRC = [["mine", "My trades"], ["bt", "Backtests"], ["all", "Everything"]];
+  function ovTrades() {
+    var T = (OV.data && OV.data.trades) || [];
+    if (OV.src === "mine") return T.filter(function (t) { return t.src !== "backtest"; });
+    if (OV.src === "bt") return T.filter(function (t) { return t.src === "backtest"; });
+    return T;
   }
+  function signR(v) { v = Math.round(v * 100) / 100; return (v > 0 ? "+" : "") + v + "R"; }
+  function cls(v) { return v > 0 ? "pos" : v < 0 ? "neg" : ""; }
+  function bar(pct, extra) { pct = Math.max(0, Math.min(100, pct || 0)); return '<div class="jbar"' + (extra || "") + '><span style="width:' + pct + '%"></span></div>'; }
+
+  function equitySvg(T) {
+    var s = T.filter(function (t) { return t.date; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    if (s.length < 2) return '<div class="jempty">Log at least two trades with a date and your growth line shows here.</div>';
+    var cum = 0, pts = [0]; s.forEach(function (t) { cum += t.r; pts.push(cum); });
+    var lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts); if (hi === lo) { hi += 1; lo -= 1; }
+    var W = 760, H = 210, pl = 46, pr = 12, pt = 14, pb = 22;
+    var x = function (i) { return pl + i / (pts.length - 1) * (W - pl - pr); }, y = function (v) { return pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb); };
+    var line = pts.map(function (v, i) { return x(i).toFixed(1) + "," + y(v).toFixed(1); }).join(" ");
+    var area = "M" + x(0) + "," + y(Math.max(lo, Math.min(hi, 0))) + " L" + line.split(" ").join(" L") + " L" + x(pts.length - 1) + "," + y(Math.max(lo, Math.min(hi, 0))) + " Z";
+    var grid = [lo, (lo + hi) / 2, hi].map(function (v) { return '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="#1a1b1e"/><text x="' + (pl - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" fill="#6b7078" font-size="10">' + signR(v) + "</text>"; }).join("");
+    var zero = lo < 0 && hi > 0 ? '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="#3a3b3f" stroke-dasharray="3 4"/>' : "";
+    return '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block"><defs><linearGradient id="eqfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9edf2" stop-opacity=".22"/><stop offset="1" stop-color="#e9edf2" stop-opacity="0"/></linearGradient></defs>' + grid + zero +
+      '<path d="' + area + '" fill="url(#eqfill)"/><polyline points="' + line + '" fill="none" stroke="#e9edf2" stroke-width="2" stroke-linejoin="round"/><circle cx="' + x(pts.length - 1) + '" cy="' + y(cum) + '" r="4" fill="#fff"/>' +
+      '<text x="' + pl + '" y="' + (H - 6) + '" fill="#6b7078" font-size="10">' + esc(fmtDate(s[0].date)) + '</text><text x="' + (W - pr) + '" y="' + (H - 6) + '" text-anchor="end" fill="#6b7078" font-size="10">' + esc(fmtDate(s[s.length - 1].date)) + "</text></svg>";
+  }
+
+  function calendarHtml(T, ym) {
+    var first = new Date(ym + "-01T12:00:00"), days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(), lead = (first.getDay() + 6) % 7;
+    var by = {}; T.forEach(function (t) { if (t.date && t.date.slice(0, 7) === ym) { var o = by[t.date] || (by[t.date] = { r: 0, n: 0 }); o.r += t.r; o.n++; } });
+    var tot = 0, green = 0, red = 0; Object.keys(by).forEach(function (k) { tot += by[k].r; if (by[k].r > 0) green++; else if (by[k].r < 0) red++; });
+    var today = todayUK(), cells = "";
+    for (var i = 0; i < lead; i++) cells += '<div class="jday off"></div>';
+    for (var d = 1; d <= days; d++) {
+      var key = ym + "-" + (d < 10 ? "0" : "") + d, o = by[key];
+      cells += '<div class="jday' + (o ? (o.r > 0 ? " up" : o.r < 0 ? " down" : " flat") : "") + (key === today ? " today" : "") + '"' + (o ? ' title="' + o.n + " trade" + (o.n > 1 ? "s" : "") + ", " + signR(o.r) + '"' : "") + '><span class="dn">' + d + "</span>" + (o ? '<span class="dr">' + signR(o.r) + "</span>" : "") + "</div>";
+    }
+    var label = first.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><span class="eyebrow">PROFIT CALENDAR</span><div style="display:flex;align-items:center;gap:6px"><button class="x jnav" data-cal="-1" aria-label="Previous month">‹</button><span style="font:600 13px var(--sg);min-width:120px;text-align:center">' + esc(label) + '</span><button class="x jnav" data-cal="1" aria-label="Next month">›</button></div></div>' +
+      '<div class="jcal">' + ["M", "T", "W", "T", "F", "S", "S"].map(function (w) { return '<div class="jwk">' + w + "</div>"; }).join("") + cells + "</div>" +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#8e939b"><span>Month <b class="' + cls(tot) + '">' + signR(tot) + '</b></span><span>Green days <b style="color:#e6e8eb">' + green + '</b></span><span>Red days <b style="color:#e6e8eb">' + red + "</b></span></div>";
+  }
+
+  var DIMS = [["setup", "Setup", function (t) { return t.setup; }], ["pair", "Pair", function (t) { return t.pair; }], ["session", "Session", function (t) { return t.session; }], ["day", "Day", function (t) { return t.day; }], ["position", "Direction", function (t) { return t.position === "LONG" || t.position === "BUY" ? "Buys" : t.position === "SHORT" || t.position === "SELL" ? "Sells" : t.position; }], ["conf", "Confluence", function (t) { return t.conf; }]];
+  function insights(T) {
+    var min = T.length >= 30 ? 5 : T.length >= 12 ? 3 : 2, all = [];
+    DIMS.forEach(function (dm) { groupBy(T, dm[2]).forEach(function (g) { if (g.n >= min) all.push({ dim: dm[1], k: g.k, n: g.n, wr: g.wr, r: g.r, avg: g.avg }); }); });
+    var good = all.filter(function (g) { return g.r > 0; }).sort(function (a, b) { return b.avg - a.avg || b.r - a.r; }).slice(0, 4);
+    var bad = all.filter(function (g) { return g.r < 0; }).sort(function (a, b) { return a.avg - b.avg || a.r - b.r; }).slice(0, 4);
+    return { good: good, bad: bad, min: min };
+  }
+  function insightRow(g) {
+    return '<div class="jins"><div><div class="jins-k">' + esc(g.k) + '</div><div class="jins-d">' + esc(g.dim) + " · " + g.n + " trades · " + g.wr + '% win rate</div></div><span class="jins-r ' + cls(g.r) + '">' + signR(g.r) + "</span></div>";
+  }
+  function currentStreak(T) {
+    var s = T.filter(function (t) { return t.r !== 0; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    if (!s.length) return { n: 0, w: true };
+    var w = s[0].r > 0, n = 0; for (var i = 0; i < s.length; i++) { if ((s[i].r > 0) === w) n++; else break; }
+    return { n: n, w: w };
+  }
+  function checkProgress(slugs) {
+    var done = 0, tot = 0;
+    slugs.forEach(function (sl) { var d = docBy(sl); if (!d) return; (d.data.blocks || []).forEach(function (b) { if (b.type === "check") b.items.forEach(function (x) { tot++; if (x.d) done++; }); }); });
+    return { done: done, tot: tot, pct: tot ? Math.round(done / tot * 100) : 0 };
+  }
+  function summarySentence(T) {
+    var m = todayUK().slice(0, 7), M = T.filter(function (t) { return (t.date || "").slice(0, 7) === m; }), sm = summary(M), ins = insights(T);
+    if (!T.length) return "Nothing logged yet. Start with the Trade Journal or your Entry Model Data, and this page will start breaking your trading down for you.";
+    var out = M.length ? "This month you've logged " + M.length + " trade" + (M.length > 1 ? "s" : "") + " and you're " + (sm.r >= 0 ? "up " : "down ") + signR(Math.abs(sm.r)).replace("+", "") + " with a " + sm.wr + "% win rate." : "No trades logged this month yet. Across everything you've logged you're at " + signR(summary(T).r) + ".";
+    if (ins.good[0]) out += " Your strongest area is " + ins.good[0].k + " (" + ins.good[0].dim.toLowerCase() + ").";
+    if (ins.bad[0]) out += " The one costing you most is " + ins.bad[0].k + " (" + ins.bad[0].dim.toLowerCase() + ").";
+    return out;
+  }
+
   async function hub(page) {
-    page.innerHTML = '<section class="hero" style="min-height:160px"><div class="eyebrow">MEMBERS JOURNAL</div><h1>Your journal.</h1></section><div class="note">Loading…</div>';
-    var err = await load(); await loadTrades();
-    if (err) { page.innerHTML = '<section class="hero" style="min-height:160px"><div class="eyebrow">MEMBERS JOURNAL</div><h1>Your journal.</h1></section>' + setupNote(err); return; }
-    var s = monthStats(), secs = hubSections();
+    var heroHtml = '<section class="hero" style="min-height:170px"><div class="eyebrow">MEMBERS JOURNAL</div><h1>Your journal.</h1><div style="font-size:14px;color:#2a2c30;max-width:520px">Everything you log, in one place, broken down so you can see what is working and what is not.</div></section>';
+    page.innerHTML = heroHtml + '<div class="note">Loading your journal…</div>';
+    var err = await load(); if (err) { page.innerHTML = heroHtml + setupNote(err); return; }
+    try { OV.data = await gatherAll(); } catch (e) { OV.data = { trades: [], signals: [] }; }
+    if (!OV.month) OV.month = todayUK().slice(0, 7);
+    drawHub(page, heroHtml);
+  }
+  function drawHub(page, heroHtml) {
+    var T = ovTrades(), S = summary(T), st = streaks(T), cur = currentStreak(T), ins = insights(T);
+    var m = todayUK().slice(0, 7), sm = summary(T.filter(function (t) { return (t.date || "").slice(0, 7) === m; }));
+    var hb = habitStats(), goals = checkProgress(["goals", "goalsyear"]), plans = of("plan").length, setups = of("setup").length;
+    var pre = of("t:presession"), preDone = pre.filter(function (x) { return x.data.outcome && x.data.outcome !== "No trade"; }), preOk = preDone.filter(function (x) { return x.data.outcome === "Played out"; }).length;
+    var wk = mondayOf(todayUK()), weekReview = of("rv:weekly").some(function (r) { return r.data.key === wk; }), monthReview = of("rv:monthly").some(function (r) { return r.data.key === m; });
+    var preToday = pre.some(function (x) { return x.data.date === todayUK(); });
+    var funded = of("facc");
+
+    var html = heroHtml +
+      '<section class="card pad jsum"><span class="eyebrow">YOUR SUMMARY</span><div class="jsum-t">' + esc(summarySentence(T)) + "</div></section>" +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div class="tabs">' + SRC.map(function (s) { return '<button class="tab' + (OV.src === s[0] ? " on" : "") + '" data-src="' + s[0] + '">' + s[1] + "</button>"; }).join("") + '</div><span class="muted" style="font-size:12px">' + (OV.src === "bt" ? "From your Entry Model Data" : OV.src === "mine" ? "From your trade journal, live trades and futures" : "Everything you have logged") + "</span></div>" +
+      '<div class="tiles" style="padding:2px 0 6px">' + tile("Trades", S.n) + tile("Win rate", S.wr + "%") + tile("Total", signR(S.r), cls(S.r)) + tile("Average", signR(S.avg), cls(S.avg)) + tile("This month", signR(sm.r), cls(sm.r)) + tile(cur.w ? "Win streak" : "Losing streak", cur.n, cur.n ? (cur.w ? "pos" : "neg") : "") + "</div>" +
+      '<div class="jgrid2"><section class="card pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="eyebrow">GROWTH IN R</span><span class="muted" style="font-size:11px">Best run ' + st.win + " wins · worst run " + st.loss + " losses</span></div>" + equitySvg(T) + "</section>" +
+      '<section class="card pad" id="calBox">' + calendarHtml(T, OV.month) + "</section></div>" +
+      '<div class="jgrid2"><section class="card pad jgood"><div class="jhead"><span class="eyebrow" style="color:#7fd99a">WHAT\'S WORKING</span><span class="muted" style="font-size:11px">Do more of this</span></div>' + (ins.good.length ? ins.good.map(insightRow).join("") : '<div class="jempty">Once you have a few trades in the same setup, pair or session, your best areas show here.</div>') + "</section>" +
+      '<section class="card pad jbad"><div class="jhead"><span class="eyebrow" style="color:#ff8a8a">WHAT\'S COSTING YOU</span><span class="muted" style="font-size:11px">Cut this or fix it</span></div>' + (ins.bad.length ? ins.bad.map(insightRow).join("") : '<div class="jempty">Nothing losing you money with enough trades to be sure. Keep logging.</div>') + "</section></div>" +
+      '<div class="jgrid3">' +
+        '<a class="card pad jcardlink" href="#/journal/habits"><div class="jhead"><span class="eyebrow">TODAY</span><span class="mini">OPEN</span></div>' +
+          '<div class="jbig">' + (hb.total ? hb.todayPct + "%" : "—") + '</div><div class="note" style="font-size:12px">' + (hb.total ? hb.todayDone + " of " + hb.total + " habits done today" : "Set up your habits") + "</div>" + bar(hb.todayPct) +
+          '<div class="jlist"><span class="' + (preToday ? "ok" : "") + '">Pre-session analysis</span><span class="' + (weekReview ? "ok" : "") + '">Weekly review</span><span class="' + (monthReview ? "ok" : "") + '">Monthly review</span></div>' +
+          '<div class="note" style="font-size:12px">Habit streak <b style="color:#e6e8eb">' + hb.streak + " day" + (hb.streak === 1 ? "" : "s") + "</b></div></a>" +
+        '<a class="card pad jcardlink" href="' + (docBy("goals") ? "#/journal/d/" + docBy("goals").id : "#/journal") + '"><div class="jhead"><span class="eyebrow">GOALS</span><span class="mini">OPEN</span></div>' +
+          '<div class="jbig">' + (goals.tot ? goals.pct + "%" : "—") + '</div><div class="note" style="font-size:12px">' + (goals.tot ? goals.done + " of " + goals.tot + " goals ticked off" : "Write your goals for the year") + "</div>" + bar(goals.pct) +
+          '<div class="jlist">' + ["goals", "goalsyear"].map(function (sl) { var g = checkProgress([sl]), d = docBy(sl); return d ? '<span class="row-pct">' + esc(d.data.title) + "<b>" + (g.tot ? g.pct + "%" : "—") + "</b></span>" : ""; }).join("") + "</div></a>" +
+        '<section class="card pad"><div class="jhead"><span class="eyebrow">DISCIPLINE</span></div>' +
+          '<div class="jlist">' +
+            '<span class="row-pct">Entry model plans<b>' + plans + "</b></span>" +
+            '<span class="row-pct">Setups written<b>' + setups + "</b></span>" +
+            '<span class="row-pct">Pre-session hit rate<b>' + (preDone.length ? Math.round(preOk / preDone.length * 100) + "%" : "—") + "</b></span>" +
+            '<span class="row-pct">Habits this week<b>' + (hb.total ? hb.weekPct + "%" : "—") + "</b></span>" +
+            '<span class="row-pct">Reviews this month<b>' + (of("rv:weekly").filter(function (r) { return (r.data.key || "").slice(0, 7) === m; }).length + (monthReview ? 1 : 0)) + "</b></span>" +
+            (funded.length ? '<span class="row-pct">Funded accounts<b>' + funded.length + "</b></span>" : "") +
+          "</div></section>" +
+      "</div>" +
+      '<a href="#/journal/ai" class="card pad" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;color:#f4f4f5"><div><div class="eyebrow">AI REVIEW</div><div style="font:600 20px var(--sg);margin-top:6px">Get the AI coach to go through all of it.</div><div class="note" style="font-size:13px">Setups, pairs, sessions, days, funded accounts, plans, habits and reviews. What is good and what to fix.</div></div><span class="btn btn-metal">Review my journal</span></a>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">' + head("SECTIONS", "All your", "pages.", "Everything you fill in. Tap any page to open it.") + "</div>" +
+      '<div class="jsecs">' + hubSections().map(sectionCard).join("") + "</div>";
+    page.innerHTML = html;
+    $$("[data-src]", page).forEach(function (b) { b.onclick = function () { OV.src = b.dataset.src; drawHub(page, heroHtml); }; });
+    $$("[data-cal]", page).forEach(function (b) {
+      b.onclick = function () { var d = new Date(OV.month + "-01T12:00:00"); d.setMonth(d.getMonth() + (+b.dataset.cal)); OV.month = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2); drawHub(page, heroHtml); };
+    });
+  }
+
+  // ======================= TRADE GALLERY =======================
+  async function galleryPage(page) {
+    var err = await load(); if (err) { page.innerHTML = crumb("Trade Gallery") + setupNote(err); return; }
     var gallery = of("shot").slice().reverse();
-    page.innerHTML = '<section class="hero" style="min-height:160px"><div class="eyebrow">MEMBERS JOURNAL</div><h1>Your journal.</h1></section>' +
-      '<div class="tiles" style="padding:6px 0;border-bottom:1px solid #18181a">' + tile("Trades this month", s.n) + tile("Win rate", s.wr + "%") + tile("Total R", (s.r > 0 ? "+" : "") + s.r.toFixed(1) + "R", s.r > 0 ? "pos" : s.r < 0 ? "neg" : "") + tile("Plans", of("plan").length) + "</div>" +
-      '<a href="#/journal/ai" class="card pad" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;color:#f4f4f5"><div><div class="eyebrow">AI REVIEW</div><div style="font:600 20px var(--sg);margin-top:6px">Get the AI coach to review all your data.</div><div class="note" style="font-size:13px">Your setups, pairs, sessions, days, confluences, funded accounts, plans and reviews.</div></div><span class="btn btn-metal">Review my data</span></a>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">' + secs.slice(0, 5).map(sectionCard).join("") + "</div>" +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">' + secs.slice(5).map(sectionCard).join("") + "</div>" +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">' + head("TRADES", "Trade", "gallery.", "Screenshots of your trades.") + '<label class="btn btn-metal" style="cursor:pointer">Add screenshot<input type="file" accept="image/*" id="shotIn" multiple hidden></label></div>' +
+    page.innerHTML = crumb("Trade Gallery") + '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">' + head("JOURNAL", "Trade", "gallery.", "Screenshots of your trades, all in one place.") + '<label class="btn btn-metal" style="cursor:pointer">Add screenshot<input type="file" accept="image/*" id="shotIn" multiple hidden></label></div>' +
       '<span class="muted" id="shotMsg" style="font-size:12px"></span>' +
       (gallery.length ? '<div class="grid-cards">' + gallery.map(function (g) {
         return '<section class="card" style="display:flex;flex-direction:column"><a href="' + esc(g.data.url) + '" target="_blank" rel="noopener"><img src="' + esc(g.data.url) + '" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-bottom:1px solid #1a1a1c"></a><div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><input class="input" data-cap="' + g.id + '" value="' + esc(g.data.name || "") + '" placeholder="Name this trade" style="height:38px;font-size:13px"><button class="x" data-delshot="' + g.id + '" style="width:38px;height:38px;flex:none" aria-label="Delete">×</button></div></section>';
-      }).join("") + "</div>" : '<section class="card pad note" style="text-align:center">No screenshots yet. Add your first trade.</section>');
+      }).join("") + "</div>" : '<section class="card pad jempty" style="text-align:center">No screenshots yet. Add your first trade.</section>');
     $("#shotIn", page).onchange = async function (e) {
       var files = Array.prototype.slice.call(e.target.files || []); if (!files.length) return;
       $("#shotMsg", page).textContent = "Uploading…";
-      try { for (var i = 0; i < files.length; i++) { var u = await upload(files[i]); await add("shot", { url: u, name: files[i].name.replace(/\.[^.]+$/, ""), date: todayUK() }); } hub(page); }
+      try { for (var i = 0; i < files.length; i++) { var u = await upload(files[i]); await add("shot", { url: u, name: files[i].name.replace(/\.[^.]+$/, ""), date: todayUK() }); } galleryPage(page); }
       catch (er) { $("#shotMsg", page).textContent = "Couldn't upload: " + (er.message || er); }
     };
     $$("[data-cap]", page).forEach(function (inp) { inp.onchange = async function () { var it = byId(inp.dataset.cap); it.data.name = inp.value; await save(it); }; });
-    $$("[data-delshot]", page).forEach(function (b) { b.onclick = async function () { if (!confirm("Delete this screenshot?")) return; await remove(byId(b.dataset.delshot)); hub(page); }; });
+    $$("[data-delshot]", page).forEach(function (b) { b.onclick = async function () { if (!confirm("Delete this screenshot?")) return; await remove(byId(b.dataset.delshot)); galleryPage(page); }; });
+  }
+
+  // ======================= HABIT TRACKER =======================
+  var HB = { week: null, editing: false };
+  var HABIT_IDEAS = {
+    "Morning routine": ["Up by 6am", "No phone for the first 30 minutes", "Check the news calendar", "Mark out HTF levels and draws on liquidity", "Write my pre-session plan"],
+    "Night routine": ["Journal today's trades", "Add screenshots to the gallery", "Plan tomorrow's pairs", "No screens 30 minutes before bed", "In bed by 11pm"],
+    "Goals": ["Train or get outside", "Read 10 pages", "Stick to my risk plan", "No revenge trades"]
+  };
+  function habitDoc() { return docBy("habits"); }
+  function habitGroups() {
+    var d = habitDoc(); if (!d) return [];
+    return (d.data.blocks || []).filter(function (b) { return b.type === "check"; }).map(function (b) { return { name: b.name, items: b.items.map(function (x) { return x.t; }) }; });
+  }
+  function habitList() { var out = []; habitGroups().forEach(function (g) { g.items.forEach(function (t) { out.push(g.name + "::" + t); }); }); return out; }
+  function hday(date) { return of("hday").filter(function (x) { return x.data.date === date; })[0]; }
+  function dayPct(date, list) { if (!list.length) return 0; var h = hday(date), done = h ? list.filter(function (k) { return h.data.done && h.data.done[k]; }).length : 0; return Math.round(done / list.length * 100); }
+  function addDays(date, n) { var t = new Date(date + "T12:00:00"); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); }
+  function habitStats() {
+    var list = habitList(), today = todayUK(), h = hday(today);
+    var todayDone = h ? list.filter(function (k) { return h.data.done && h.data.done[k]; }).length : 0;
+    var streak = 0, d = today; if (dayPct(d, list) < 80) d = addDays(d, -1);
+    while (list.length && dayPct(d, list) >= 80 && streak < 1000) { streak++; d = addDays(d, -1); }
+    var best = 0, run = 0; of("hday").map(function (x) { return x.data.date; }).sort().forEach(function (dt, i, arr) { var ok = dayPct(dt, list) >= 80; if (ok && i > 0 && arr[i - 1] === addDays(dt, -1) && dayPct(arr[i - 1], list) >= 80) run++; else run = ok ? 1 : 0; if (run > best) best = run; });
+    var mon = mondayOf(today), wsum = 0, wn = 0; for (var i = 0; i < 7; i++) { var dd = addDays(mon, i); if (dd > today) break; wsum += dayPct(dd, list); wn++; }
+    return { total: list.length, todayDone: todayDone, todayPct: list.length ? Math.round(todayDone / list.length * 100) : 0, streak: streak, best: Math.max(best, streak), weekPct: wn ? Math.round(wsum / wn) : 0 };
+  }
+  async function habitsPage(page) {
+    var err = await load(); if (err) { page.innerHTML = crumb("Habit Tracker") + setupNote(err); return; }
+    if (!habitDoc()) await add("doc", { slug: "habits", title: "Habit Tracker", cols: 3, blocks: [chk("Morning routine", []), chk("Night routine", []), chk("Goals", [])] });
+    if (!HB.week) HB.week = mondayOf(todayUK());
+    drawHabits(page);
+  }
+  function drawHabits(page) {
+    var groups = habitGroups(), list = habitList(), st = habitStats(), today = todayUK(), days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(HB.week, i));
+    var wkLabel = fmtDate(days[0]) + " – " + fmtDate(days[6]);
+    var html = crumb("Habit Tracker") + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px">' + head("TRADING TOOLS", "Habit", "tracker.", "Tick off your routine every day. The traders who show up the same way every day are the ones who last.") +
+      '<button class="btn btn-ghost" id="hEdit">' + (HB.editing ? "Done" : "Edit habits") + "</button></div>" +
+      '<div class="tiles" style="padding:2px 0 6px">' + tile("Today", st.total ? st.todayPct + "%" : "—", st.todayPct === 100 ? "pos" : "") + tile("This week", st.total ? st.weekPct + "%" : "—") + tile("Streak", st.streak + (st.streak === 1 ? " day" : " days"), st.streak ? "pos" : "") + tile("Best streak", st.best + (st.best === 1 ? " day" : " days")) + "</div>" +
+      '<div class="note" style="font-size:12px;margin-top:-14px">A day counts towards your streak when you do 80% or more of your habits.</div>';
+    if (HB.editing) {
+      html += '<div class="jgrid3">' + groups.map(function (g, gi) {
+        return '<section class="card pad" style="display:flex;flex-direction:column;gap:10px"><input class="input" data-hgname="' + gi + '" value="' + esc(g.name) + '" style="height:42px;font-weight:600"><label class="field">One habit per line<textarea class="input" data-hglines="' + gi + '" rows="' + Math.max(5, g.items.length + 1) + '" style="height:auto;padding:12px;line-height:1.6">' + esc(g.items.join("\n")) + "</textarea></label>" +
+          (HABIT_IDEAS[g.name] ? '<button class="chip" data-hideas="' + gi + '" style="align-self:flex-start">Add suggested habits</button>' : "") + "</section>";
+      }).join("") + "</div>" +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-metal" id="hSave">Save habits</button><button class="btn btn-ghost" id="hAddGroup">Add a group</button></div><span class="muted" id="hMsg" style="font-size:12px"></span>';
+    } else if (!list.length) {
+      html += '<section class="card pad" style="display:flex;flex-direction:column;gap:14px;align-items:flex-start"><div style="font:600 20px var(--sg)">Set up your routine</div><div class="note">Add the things you want to do every day: your morning routine before the session, your night routine after it, and anything else you are working on.</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-metal" id="hStarter">Use the SDX starter routine</button><button class="btn btn-ghost" id="hOwn">Write my own</button></div></section>';
+    } else {
+      html += '<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px 6px;flex-wrap:wrap"><span class="eyebrow">THIS WEEK</span><div style="display:flex;align-items:center;gap:6px"><button class="x jnav" data-hwk="-7" aria-label="Previous week">‹</button><span style="font:600 13px var(--sg);min-width:170px;text-align:center">' + esc(wkLabel) + '</span><button class="x jnav" data-hwk="7" aria-label="Next week">›</button>' + (HB.week !== mondayOf(today) ? '<button class="chip" data-hwk="0">This week</button>' : "") + "</div></div>" +
+        '<div class="scroll-x"><table class="jhab"><thead><tr><th style="min-width:200px"></th>' + days.map(function (d) { var t = new Date(d + "T12:00:00"); return '<th class="' + (d === today ? "now" : "") + '"><div>' + t.toLocaleDateString("en-GB", { weekday: "short" }) + "</div><div class=\"dd\">" + t.getDate() + "</div></th>"; }).join("") + '<th class="wk">Week</th></tr></thead><tbody>' +
+        groups.filter(function (g) { return g.items.length; }).map(function (g) {
+          return '<tr class="grp"><td colspan="9">' + esc(g.name) + "</td></tr>" + g.items.map(function (t) {
+            var k = g.name + "::" + t, cnt = 0, past = 0;
+            var cells = days.map(function (d) { var h = hday(d), on = !!(h && h.data.done && h.data.done[k]), fut = d > today; if (!fut) { past++; if (on) cnt++; } return '<td class="' + (d === today ? "now" : "") + '"><button class="hdot' + (on ? " on" : "") + (fut ? " fut" : "") + '" data-hd="' + d + '" data-hk="' + esc(k) + '"' + (fut ? " disabled" : "") + ' aria-label="' + esc(t) + " " + d + '">' + (on ? "✓" : "") + "</button></td>"; }).join("");
+            return "<tr><td class=\"hname\">" + esc(t) + "</td>" + cells + '<td class="wk">' + (past ? Math.round(cnt / past * 100) + "%" : "—") + "</td></tr>";
+          }).join("");
+        }).join("") +
+        '<tr class="tot"><td>Done</td>' + days.map(function (d) { return '<td class="' + (d === today ? "now" : "") + '">' + (d > today ? "" : dayPct(d, list) + "%") + "</td>"; }).join("") + "<td></td></tr>" +
+        "</tbody></table></div></section>";
+    }
+    page.innerHTML = html;
+    if (!HB.editing && list.length) mountAI(page, "habits:tracker", "Habit tracker", "habits", async function () {
+      var lines = list.map(function (k) { var c = 0, n = 0; for (var i = 0; i < 28; i++) { var d = addDays(today, -i), h = hday(d); n++; if (h && h.data.done && h.data.done[k]) c++; } return "- " + k.replace("::", ": ") + " — done " + c + " of the last " + n + " days"; });
+      return "Habit completion over the last 4 weeks:\n" + lines.join("\n") + "\nCurrent streak " + st.streak + " days, best " + st.best + " days, this week " + st.weekPct + "%.";
+    }, true);
+    var redraw = function () { drawHabits(page); };
+    $("#hEdit", page).onclick = function () { HB.editing = !HB.editing; redraw(); };
+    $$("[data-hwk]", page).forEach(function (b) { b.onclick = function () { var n = +b.dataset.hwk; HB.week = n === 0 ? mondayOf(today) : addDays(HB.week, n); redraw(); }; });
+    $$("[data-hd]", page).forEach(function (b) {
+      b.onclick = async function () {
+        var d = b.dataset.hd, k = b.dataset.hk, h = hday(d);
+        try {
+          if (!h) { await add("hday", { date: d, done: (function () { var o = {}; o[k] = true; return o; })() }); }
+          else { h.data.done = h.data.done || {}; if (h.data.done[k]) delete h.data.done[k]; else h.data.done[k] = true; await save(h); }
+          redraw();
+        } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+      };
+    });
+    var starter = $("#hStarter", page); if (starter) starter.onclick = async function () {
+      var d = habitDoc(); d.data.blocks = Object.keys(HABIT_IDEAS).map(function (n) { return chk(n, HABIT_IDEAS[n]); }); await save(d); redraw();
+    };
+    var own = $("#hOwn", page); if (own) own.onclick = function () { HB.editing = true; redraw(); };
+    if (!HB.editing) return;
+    var readHabits = function () {
+      var d = habitDoc(), others = (d.data.blocks || []).filter(function (b) { return b.type !== "check"; }), checks = (d.data.blocks || []).filter(function (b) { return b.type === "check"; });
+      checks.forEach(function (b, gi) {
+        var nm = $('[data-hgname="' + gi + '"]', page), ln = $('[data-hglines="' + gi + '"]', page);
+        if (nm) b.name = nm.value.trim() || b.name;
+        if (ln) b.items = ln.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean).map(function (t) { return { t: t, d: false }; });
+      });
+      d.data.blocks = checks.concat(others); return d;
+    };
+    $$("[data-hideas]", page).forEach(function (b) {
+      b.onclick = function () { var gi = +b.dataset.hideas, ta = $('[data-hglines="' + gi + '"]', page), nm = $('[data-hgname="' + gi + '"]', page).value; var have = ta.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean); (HABIT_IDEAS[nm] || []).forEach(function (t) { if (have.indexOf(t) < 0) have.push(t); }); ta.value = have.join("\n"); };
+    });
+    $("#hAddGroup", page).onclick = async function () { var d = readHabits(); d.data.blocks.splice(d.data.blocks.filter(function (b) { return b.type === "check"; }).length, 0, chk("New group", [])); redraw(); };
+    $("#hSave", page).onclick = async function () {
+      var d = readHabits(); d.data.blocks = d.data.blocks.filter(function (b) { return b.type !== "check" || b.items.length || b.name !== "New group"; });
+      $("#hMsg", page).textContent = "Saving…";
+      try { await save(d); HB.editing = false; redraw(); } catch (e) { $("#hMsg", page).textContent = "Couldn't save: " + (e.message || e); }
+    };
   }
 
   // ======================= DOC PAGES (plans, setups, checklists, notes) =======================
@@ -182,16 +415,16 @@
     }).join("") + "</div>";
   }
   function viewBlock(b, bi) {
-    var h = '<div class="eyebrow" style="margin-bottom:10px;text-transform:uppercase">' + esc(b.name || "") + "</div>";
+    var h = '<div class="jblk-h"><span class="jblk-t">' + esc(b.name || "") + "</span></div>";
     if (b.type === "check") {
-      var done = b.items.filter(function (x) { return x.d; }).length;
-      h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="eyebrow" style="text-transform:uppercase">' + esc(b.name || "") + '</span>' + (b.items.length ? '<span class="mini">' + done + "/" + b.items.length + "</span>" : "") + "</div>";
-      return h + (b.items.length ? b.items.map(function (it, k) {
-        return '<label style="display:flex;gap:12px;align-items:center;min-height:40px;cursor:pointer;font-size:14px;' + (it.d ? "color:#6b7078;text-decoration:line-through" : "color:#e6e8eb") + '"><input type="checkbox" data-tick="' + bi + ":" + k + '"' + (it.d ? " checked" : "") + ' style="width:18px;height:18px;accent-color:#c9ccd1;flex:none">' + esc(it.t) + "</label>";
-      }).join("") : '<div class="note" style="font-size:12px">Nothing here yet. Tap Edit to add.</div>');
+      var done = b.items.filter(function (x) { return x.d; }).length, pc = b.items.length ? Math.round(done / b.items.length * 100) : 0;
+      h = '<div class="jblk-h"><span class="jblk-t">' + esc(b.name || "") + '</span>' + (b.items.length ? '<span class="jblk-c' + (pc === 100 ? " full" : "") + '">' + done + " / " + b.items.length + "</span>" : "") + "</div>";
+      return h + (b.items.length ? '<div class="jchecks">' + b.items.map(function (it, k) {
+        return '<label class="jcheck' + (it.d ? " on" : "") + '"><input type="checkbox" data-tick="' + bi + ":" + k + '"' + (it.d ? " checked" : "") + '><span class="jbox">' + (it.d ? "✓" : "") + '</span><span class="jtxt">' + esc(it.t) + "</span></label>";
+      }).join("") + "</div>" : '<button class="jadd" data-quickedit="1">+ Add items</button>');
     }
-    if (b.type === "list") return h + (b.items.length ? '<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:#e6e8eb">' + b.items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ol>" : '<div class="note" style="font-size:12px">Nothing here yet. Tap Edit to add.</div>');
-    if (b.type === "text") return '<details' + (b.text && b.text.length < 400 ? " open" : "") + '><summary class="eyebrow" style="cursor:pointer;margin-bottom:10px;text-transform:uppercase">' + esc(b.name || "") + '</summary><div style="white-space:pre-wrap;font-size:14px;line-height:1.7;color:#d6d8dc">' + (b.text ? esc(b.text) : '<span class="note">Nothing here yet. Tap Edit to add.</span>') + "</div></details>";
+    if (b.type === "list") return h + (b.items.length ? '<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:#e6e8eb">' + b.items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ol>" : '<button class="jadd" data-quickedit="1">+ Add items</button>');
+    if (b.type === "text") return '<details' + (b.text && b.text.length < 400 ? " open" : "") + '><summary class="jblk-t" style="cursor:pointer;margin-bottom:12px;display:block">' + esc(b.name || "") + '</summary><div style="white-space:pre-wrap;font-size:14px;line-height:1.7;color:#d6d8dc">' + (b.text ? esc(b.text) : '<button class="jadd" data-quickedit="1">+ Write notes</button>') + "</div></details>";
     if (b.type === "images") return h + imgGrid(b.urls, null, bi, false);
     if (b.type === "links") return h + (b.items.length ? b.items.map(function (l) { var ext = /^https?:/.test(l.u); return '<a class="list-link" href="' + esc(l.u) + '"' + (ext ? ' target="_blank" rel="noopener"' : "") + "><span>" + esc(l.t) + '</span><span class="mini">OPEN</span></a>'; }).join("") : '<div class="note" style="font-size:12px">No links yet.</div>');
     return "";
@@ -239,7 +472,9 @@
         '<div><button class="btn btn-ghost" id="dDel" style="color:#ff8a8a;border-color:#3a1c1c">Delete this page</button></div>' +
         '<span class="muted" id="dMsg" style="font-size:12px"></span>';
     } else {
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + (cols >= 3 ? 240 : cols === 2 ? 300 : 520) + 'px,1fr));gap:16px;align-items:start">' +
+      var allC = 0, allD = 0; blocks.forEach(function (b) { if (b.type === "check") b.items.forEach(function (x) { allC++; if (x.d) allD++; }); });
+      if (allC) html += '<section class="card pad" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap"><div style="min-width:120px"><div class="eyebrow">PROGRESS</div><div class="jbig" style="margin-top:4px">' + Math.round(allD / allC * 100) + '%</div></div><div style="flex:1;min-width:200px">' + bar(Math.round(allD / allC * 100)) + '<div class="note" style="font-size:12px;margin-top:8px">' + allD + " of " + allC + " ticked</div></div></section>";
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + (cols >= 3 ? 260 : cols === 2 ? 320 : 520) + 'px,1fr));gap:16px;align-items:start">' +
         blocks.map(function (b, bi) { return '<section class="card pad" style="' + (b.type === "images" || b.type === "text" ? "grid-column:1/-1;" : "") + '">' + viewBlock(b, bi) + "</section>"; }).join("") + "</div>" +
         (blocks.length ? "" : '<section class="card pad note">This page is empty. Tap Edit to add sections.</section>');
     }
@@ -249,9 +484,10 @@
       var dk = item.kind === "plan" ? "plan" : item.kind === "setup" ? "setup" : item.kind === "page" ? "page" : ({ checklist: "checklist", risk: "risk", goals: "goals", goalsyear: "goals", habits: "habits" })[d.slug] || "other";
       mountAI(page, "doc:" + item.id, d.title, dk, async function () { return d.title + "\n\n" + blocksText(d); }, dk === "plan" || dk === "setup" || dk === "risk" || dk === "checklist");
       $("#dEdit", page).onclick = function () { ED[item.id] = JSON.parse(JSON.stringify(item.data)); redraw(); };
-      var cl = $("#dClear", page); if (cl) cl.onclick = async function () { blocks.forEach(function (b) { if (b.type === "check") b.items.forEach(function (x) { x.d = false; }); }); redraw(); await save(item); };
+      $$("[data-quickedit]", page).forEach(function (q) { q.onclick = function (e) { e.preventDefault(); ED[item.id] = JSON.parse(JSON.stringify(item.data)); redraw(); }; });
+      var cl = $("#dClear", page); if (cl) cl.onclick = async function () { item.data.blocks.forEach(function (b) { if (b.type === "check") b.items.forEach(function (x) { x.d = false; }); }); redraw(); await save(item); };
       $$("[data-tick]", page).forEach(function (c) {
-        c.onchange = async function () { var p = c.dataset.tick.split(":"); blocks[+p[0]].items[+p[1]].d = c.checked; redraw(); try { await save(item); } catch (e) { alert("Couldn't save: " + e.message); } };
+        c.onchange = async function () { var p = c.dataset.tick.split(":"); item.data.blocks[+p[0]].items[+p[1]].d = c.checked; redraw(); try { await save(item); } catch (e) { alert("Couldn't save: " + e.message); } };
       });
       return;
     }
@@ -892,6 +1128,8 @@
     if (s === "pips") return pipsPage(page);
     if (s === "ai") return aiPage(page);
     if (s === "drawdown") return drawdownPage(page);
+    if (s === "habits") return habitsPage(page);
+    if (s === "gallery") return galleryPage(page);
     return hub(page);
   };
 })();
