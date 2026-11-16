@@ -48,7 +48,7 @@
   // ---------- tabs (shared with the Access tab in pages.js) ----------
   function tabs() {
     var pend = allReqs().filter(function (r) { return r.status === "requested"; }).length;
-    var t = [["overview", "Overview"], ["students", "Students"], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["access", "Access"]];
+    var t = [["overview", "Overview"], ["students", "Students"], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
     return '<div class="chips" style="margin-top:4px">' + t.map(function (x) { return '<button class="chip' + (S.tab === x[0] ? " on" : "") + '" data-atab="' + x[0] + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
   }
   function wire(page) {
@@ -124,6 +124,55 @@
       }).join("") + "</tbody></table></div>" + (shown.length ? "" : '<div class="note" style="padding:30px;text-align:center">Nothing here.</div>') + "</section>";
   }
 
+  // ---------- add past Elite buyers ----------
+  var IM = { text: "", res: null, busy: false };
+  function splitRow(line) {
+    var out = [], cur = "", q = false;
+    for (var i = 0; i < line.length; i++) { var c = line[i]; if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; } else if ((c === "," || c === "\t" || c === ";") && !q) { out.push(cur); cur = ""; } else cur += c; }
+    out.push(cur); return out.map(function (x) { return x.trim(); });
+  }
+  function parsePeople(text) {
+    var lines = String(text || "").split(/\r?\n/).filter(function (l) { return l.trim(); });
+    if (!lines.length) return [];
+    var hdr = splitRow(lines[0]).map(function (h) { return h.toLowerCase(); });
+    var ei = hdr.findIndex(function (h) { return h.indexOf("email") > -1; });
+    var people = [];
+    if (ei > -1) {
+      var ni = hdr.findIndex(function (h) { return h === "name" || h === "full name"; }), fi = hdr.findIndex(function (h) { return h.indexOf("first") > -1; }), li = hdr.findIndex(function (h) { return h.indexOf("last") > -1; });
+      lines.slice(1).forEach(function (l) { var c = splitRow(l); var nm = ni > -1 ? c[ni] : [fi > -1 ? c[fi] : "", li > -1 ? c[li] : ""].join(" ").trim(); if (c[ei]) people.push({ email: c[ei].toLowerCase(), name: nm || "" }); });
+    } else {
+      lines.forEach(function (l) { (l.match(/[^\s,;<>"]+@[^\s,;<>"]+\.[^\s,;<>"]+/g) || []).forEach(function (e) { people.push({ email: e.toLowerCase(), name: "" }); }); });
+    }
+    var seen = {}; return people.filter(function (p) { if (seen[p.email]) return false; seen[p.email] = 1; return /@/.test(p.email); });
+  }
+  function importTab() {
+    var P2 = parsePeople(IM.text), R = IM.res;
+    return '<section class="card pad" style="display:flex;flex-direction:column;gap:14px;max-width:820px">' +
+      '<div style="font:600 18px var(--sg)">Give access to people who bought the Elite Pack before.</div>' +
+      '<div class="note" style="font-size:13px">New buyers get added automatically. For anyone who bought before that was set up: in Kajabi go to Contacts (People), filter by the Elite Pack offer, then Export. Upload that file here, or paste the emails one per line. They can then log in on the Elite tab with the email they bought with.</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label class="btn btn-ghost" style="cursor:pointer">Upload Kajabi CSV<input type="file" id="imFile" accept=".csv,.txt,text/csv" style="display:none"></label><span class="muted" style="font-size:12px">or paste below</span></div>' +
+      '<textarea class="input" id="imText" rows="9" placeholder="jordan@gmail.com&#10;kai@hotmail.co.uk" style="font-family:ui-monospace,monospace;font-size:12px;padding:12px;height:auto">' + esc(IM.text) + "</textarea>" +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span class="muted" style="font-size:13px" id="imCount">' + P2.length + " email" + (P2.length === 1 ? "" : "s") + ' found</span><button class="btn btn-metal" id="imGo"' + (P2.length && !IM.busy ? "" : " disabled") + ">" + (IM.busy ? "Adding…" : "Give Elite access") + "</button></div>" +
+      (R ? '<div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #18181a;padding-top:14px;font-size:13px">' + (R.err ? '<div style="color:#ff8a8a">' + esc(R.err) + "</div>" :
+        '<div style="color:#7fd99a">' + R.added.length + " added with Elite access.</div>" +
+        (R.already.length ? '<div class="muted">' + R.already.length + " already had access.</div>" : "") +
+        (R.revoked.length ? '<div style="color:#ffb26b">' + R.revoked.length + " were revoked before, so left revoked: " + esc(R.revoked.join(", ")) + ". Restore them on the Access tab if you want them back.</div>" : "") +
+        (R.bad.length ? '<div style="color:#ff8a8a">' + R.bad.length + " didn't look like emails: " + esc(R.bad.join(", ")) + "</div>" : "")) + "</div>" : "") +
+      "</section>";
+  }
+  function wireImport(page) {
+    var ta = $("#imText", page); if (!ta) return;
+    ta.oninput = function () { IM.text = ta.value; var n = parsePeople(IM.text).length; $("#imCount", page).textContent = n + " email" + (n === 1 ? "" : "s") + " found"; $("#imGo", page).disabled = !n; };
+    $("#imFile", page).onchange = function (e) { var f = e.target.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { IM.text = String(rd.result || ""); IM.res = null; draw(page); }; rd.readAsText(f); };
+    $("#imGo", page).onclick = async function () {
+      var people = parsePeople(IM.text); if (!people.length) return;
+      IM.busy = true; draw(page);
+      try { IM.res = await C().call("/admin/import-elite", { people: people }); IM.text = ""; C().AD.list = (await C().call("/admin/members")).members; }
+      catch (e) { IM.res = window.SDX_SAMPLE_MEMBERS ? { added: people.map(function (p) { return p.email; }), already: [], revoked: [], bad: [] } : { err: "Couldn't add them: " + e.message }; }
+      IM.busy = false; draw(page);
+    };
+  }
+
   // ---------- one student ----------
   function detail() {
     var m = students().filter(function (x) { return x.email === S.open; })[0];
@@ -155,10 +204,11 @@
   // ---------- page ----------
   function draw(page) {
     if (S.tab === "access") { C().drawAccess(page); return; }
-    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView." }[S.tab];
+    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack." }[S.tab];
     page.innerHTML = head(sub) + tabs() + (S.msg ? '<div class="note">' + esc(S.msg) + "</div>" : "") +
-      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : scannersTab()) + (S.open ? detail() : "");
+      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
     wire(page);
+    wireImport(page);
     $$("[data-open]", page).forEach(function (b) { b.onclick = function () { openStudent(page, b.dataset.open); }; });
     $$("[data-ap]", page).forEach(function (b) { b.onclick = function () { S.plan = b.dataset.ap; draw(page); }; });
     $$("[data-rf]", page).forEach(function (b) { b.onclick = function () { S.reqFilter = b.dataset.rf; draw(page); }; });
