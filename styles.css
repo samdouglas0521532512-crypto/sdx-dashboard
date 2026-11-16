@@ -245,3 +245,8 @@ td { padding: 12px 14px; border-top: 1px solid #161618; }
   .jday .dr { font-size: 10px; }
   .jsum-t { font-size: 15px; }
 }
+
+/* admin scanner data: month calendar */
+.sdm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sdm-m { font: inherit; }
+@media (max-width: 760px) { .sdm-grid { grid-template-columns: repeat(2, 1fr); } }

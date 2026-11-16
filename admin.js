@@ -48,7 +48,7 @@
   // ---------- tabs (shared with the Access tab in pages.js) ----------
   function tabs() {
     var pend = allReqs().filter(function (r) { return r.status === "requested"; }).length;
-    var t = [["overview", "Overview"], ["students", "Students"], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
+    var t = [["overview", "Overview"], ["students", "Students"], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["scandata", "Scanner data"], ["access", "Access"]];
     return '<div class="chips" style="margin-top:4px">' + t.map(function (x) { return '<button class="chip' + (S.tab === x[0] ? " on" : "") + '" data-atab="' + x[0] + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
   }
   function wire(page) {
@@ -204,10 +204,11 @@
   // ---------- page ----------
   function draw(page) {
     if (S.tab === "access") { C().drawAccess(page); return; }
-    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack." }[S.tab];
+    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack.", scandata: "Backtest results for every scanner. Pick a year, then tap a month." }[S.tab];
     page.innerHTML = head(sub) + tabs() + (S.msg ? '<div class="note">' + esc(S.msg) + "</div>" : "") +
-      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
+      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : S.tab === "scandata" ? window.SDX_ADMIN_SCANDATA.render() : scannersTab()) + (S.open ? detail() : "");
     wire(page);
+    if (S.tab === "scandata") window.SDX_ADMIN_SCANDATA.wire(page, function () { draw(page); });
     wireImport(page);
     $$("[data-open]", page).forEach(function (b) { b.onclick = function () { openStudent(page, b.dataset.open); }; });
     $$("[data-ap]", page).forEach(function (b) { b.onclick = function () { S.plan = b.dataset.ap; draw(page); }; });
