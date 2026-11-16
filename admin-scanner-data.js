@@ -10,7 +10,7 @@
   var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"]];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false };
+  var S = { gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -35,6 +35,7 @@
   function cls(x) { return x > 0 ? "pos" : x < 0 ? "neg" : ""; }
   function count(L, res) { return L.filter(function (t) { var x = r(t); return res === "TP" ? x > 0 : res === "BE" ? x === 0 : x < 0; }).length; }
   function pips(L) { var any = false, x = L.reduce(function (a, t) { if (t[7] != null) { any = true; return a + r(t) * t[7]; } return a; }, 0); return any ? Math.round(x) : null; }
+  function net(L) { var any = false, x = L.reduce(function (a, t) { if (t[8] != null) { any = true; return a + r(t) - t[8]; } return a + r(t); }, 0); return any ? Math.round(x * 10) / 10 : null; }
   function pTxt(x) { return (x > 0 ? "+" : "") + x.toLocaleString("en-GB") + " pips"; }
   function tpHits(L) { var h = [0, 0, 0]; L.forEach(function (t) { var i = ["TP1", "TP2", "TP3"].indexOf(t[5]); if (i > -1) h[i]++; }); return h; }
   function wr(L) { var w = count(L, "TP"), l = count(L, "SL"); return w + l ? Math.round((w / (w + l)) * 1000) / 10 + "%" : "—"; }
@@ -49,6 +50,7 @@
   function stats(L, extra) {
     return '<div class="tiles">' + tile("Trades", L.length) + tile("Wins", count(L, "TP"), "pos") + tile("Risk free", count(L, "BE")) + tile("Losses", count(L, "SL"), "neg") +
       tile("Win rate (W vs L)", wr(L)) + tile("Total R", rTxt(sumR(L)), cls(sumR(L))) +
+      (net(L) != null ? tile("R after spread", rTxt(net(L)), cls(net(L))) : "") +
       (pips(L) != null ? tile("Total pips", pTxt(pips(L)), cls(pips(L))) : "") +
       (tpHits(L)[0] ? tile("Reached TP1 / TP2 / TP3", tpHits(L).join(" / ")) : "") +
       (extra ? tile("Worst drawdown", rTxt(drawdown(L)), "neg") + tile("Longest losing run", loseRun(L)) + tile("Positive months", posMonths(L)) + tile("Trades per week", weeks(L)) : "") + "</div>";
@@ -76,12 +78,12 @@
       if (L.length && (best === null || R > best)) best = R;
       return { v: v, L: L, R: R };
     });
-    var hd = "<th>Version</th><th class=\"r\">Trades</th><th class=\"r\">W / RF / L</th><th class=\"r\">Win rate</th><th class=\"r\">Total R</th><th class=\"r\">Pips</th>" + (full ? '<th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">Positive months</th>' : "");
+    var hd = "<th>Version</th><th class=\"r\">Trades</th><th class=\"r\">W / RF / L</th><th class=\"r\">Win rate</th><th class=\"r\">Total R</th><th class=\"r\">After spread</th><th class=\"r\">Pips</th>" + (full ? '<th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">Positive months</th>' : "");
     return '<div class="scroll-x"><table style="min-width:' + (full ? 820 : 520) + 'px"><thead><tr>' + hd + "</tr></thead><tbody>" +
       rows.map(function (x) {
         var L = x.L, on = x.v.id === cur, top = L.length && x.R === best;
         return '<tr style="' + (on ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x.v.name) + (top ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") + (on ? ' <span class="muted" style="font-size:11px">· showing</span>' : "") + "</td>" +
-          '<td class="r">' + L.length + '</td><td class="r muted">' + count(L, "TP") + " / " + count(L, "BE") + " / " + count(L, "SL") + '</td><td class="r">' + wr(L) + '</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (L.length ? rTxt(x.R) : "—") + '</td><td class="r ' + cls(pips(L)) + '">' + (L.length && pips(L) != null ? pTxt(pips(L)) : "—") + "</td>" +
+          '<td class="r">' + L.length + '</td><td class="r muted">' + count(L, "TP") + " / " + count(L, "BE") + " / " + count(L, "SL") + '</td><td class="r">' + wr(L) + '</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (L.length ? rTxt(x.R) : "—") + '</td><td class="r ' + cls(net(L)) + '" style="font-weight:600">' + (L.length && net(L) != null ? rTxt(net(L)) : "—") + '</td><td class="r ' + cls(pips(L)) + '">' + (L.length && pips(L) != null ? pTxt(pips(L)) : "—") + "</td>" +
           (full ? '<td class="r neg">' + rTxt(drawdown(L)) + '</td><td class="r">' + loseRun(L) + '</td><td class="r">' + posMonths(L) + "</td>" : "") + "</tr>";
       }).join("") + "</tbody></table></div>";
   }
@@ -128,18 +130,45 @@
   // ---------- management plans ----------
   function plansTable(key) {
     var d = D(key), P = d && d.plans; if (!P) return "";
-    var cur = curVer(key), k = S.plSort;
-    var rows = P.rows.slice().sort(function (a, b) { return k === "R" ? b[3] - a[3] : k === "pips" ? b[4] - a[4] : k === "win" ? b[5] - a[5] || b[3] - a[3] : b[6] - a[6] || b[3] - a[3]; });
-    var inUse = function (x) { return cur && cur.id.indexOf("plan") > -1 && cur.settings.indexOf("TP3 " + x[0].split("/")[2] + "R") > -1 && x[0].indexOf("0.25/0.5/") === 0 && x[1] === "20/30/50" && x[2].indexOf("to TP1 at TP2") > -1; };
+    var k = S.plSort;
+    var rows = P.rows.slice().sort(function (a, b) { return k === "R" ? b[2] - a[2] : k === "pips" ? b[3] - a[3] : k === "win" ? b[4] - a[4] || b[2] - a[2] : b[5] - a[5] || b[2] - a[2]; });
     function chip(v, label) { return '<button class="chip' + (k === v ? " on" : "") + '" data-pls="' + v + '">' + label + "</button>"; }
-    return '<span class="eyebrow" style="margin-top:6px">MANAGEMENT PLANS · ALL YEARS</span><div class="note" style="font-size:12px">' + esc(P.note) + "</div>" +
-      '<div class="chips">' + chip("R", "Most R") + chip("pips", "Most pips") + chip("win", "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
-      '<div class="scroll-x"><table style="min-width:760px"><thead><tr><th>TP1 / TP2 / TP3 (R)</th><th>Split %</th><th>Stop</th><th class="r">Total R</th><th class="r">Pips</th><th class="r">In profit</th><th class="r">Drawdown</th></tr></thead><tbody>' +
+    return '<span class="eyebrow">TRADE MANAGEMENT PLANS · ALL YEARS</span><div class="note" style="font-size:12px">' + esc(P.note) + "</div>" +
+      '<div class="chips">' + chip("R", "Most R after spread") + chip("pips", "Most pips") + chip("win", "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
+      '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Plan</th><th class="r">Total R</th><th class="r">After spread</th><th class="r">Pips</th><th class="r">In profit</th><th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">2022-24 after spread</th><th class="r">2025-26 after spread</th></tr></thead><tbody>' +
       rows.map(function (x) {
-        var on = inUse(x);
-        return '<tr style="' + (on ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x[0]) + (on ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + "</td><td>" + esc(x[1]) + '</td><td class="muted">' + esc(x[2]) + '</td><td class="r ' + cls(x[3]) + '" style="font-weight:600">' + rTxt(x[3]) +
-          '</td><td class="r ' + cls(x[4]) + '">' + pTxt(x[4]) + '</td><td class="r">' + x[5] + '%</td><td class="r neg">' + rTxt(x[6]) + "</td></tr>";
+        return '<tr style="' + (x[9] ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x[0]) + (x[9] ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + '</td><td class="r ' + cls(x[1]) + '">' + rTxt(x[1]) +
+          '</td><td class="r ' + cls(x[2]) + '" style="font-weight:600">' + rTxt(x[2]) + '</td><td class="r ' + cls(x[3]) + '">' + pTxt(x[3]) + '</td><td class="r">' + x[4] + '%</td><td class="r neg">' + rTxt(x[5]) +
+          '</td><td class="r">' + x[6] + '</td><td class="r ' + cls(x[7]) + '">' + rTxt(x[7]) + '</td><td class="r ' + cls(x[8]) + '">' + rTxt(x[8]) + "</td></tr>";
       }).join("") + "</tbody></table></div>";
+  }
+
+  // ---------- SL grid (risk management) ----------
+  function slGrid(key, y) {
+    var d = D(key), G = d && d.grid; if (!G) return "";
+    var bufs = [], o = S.gr, per = y || "all";
+    G.rows.forEach(function (x) { if (bufs.indexOf(x.buf) < 0) bufs.push(x.buf); });
+    if (bufs.indexOf(o.buf) < 0) o.buf = bufs.indexOf("0.5") > -1 ? "0.5" : bufs[0];
+    var rows = G.rows.filter(function (x) { return x.buf === o.buf; }), sls = [], tps = [];
+    rows.forEach(function (x) { if (sls.indexOf(x.minsl) < 0) sls.push(x.minsl); if (tps.indexOf(x.tp) < 0) tps.push(x.tp); });
+    sls.sort(function (a, b) { return a - b; }); tps.sort(function (a, b) { return a - b; });
+    var best = null;
+    rows.forEach(function (x) { var q = x.res[per]; if (q && q.n && (best === null || q.R > best)) best = q.R; });
+    function chip(g, v, label) { return '<button class="chip' + (String(o[g]) === String(v) ? " on" : "") + '" data-gro="' + g + '" data-grv="' + v + '">' + esc(label) + "</button>"; }
+    var tbl = '<div class="scroll-x"><table style="min-width:560px"><thead><tr><th>Skip if SL under</th>' + tps.map(function (x) { return '<th class="r">TP ' + x + "R</th>"; }).join("") + "</tr></thead><tbody>" +
+      sls.map(function (sl) {
+        return "<tr><td>" + (sl === 0 ? "No minimum" : sl + " pips") + "</td>" + tps.map(function (tp) {
+          var x = rows.filter(function (z) { return z.minsl === sl && z.tp === tp; })[0], q = x && x.res[per];
+          if (!q || !q.n) return '<td class="r muted">—</td>';
+          var w = q.W + q.L ? Math.round((q.W / (q.W + q.L)) * 1000) / 10 : 0;
+          var main = o.k === "R" ? '<span class="' + cls(q.R) + '" style="font-weight:600">' + rTxt(q.R) + "</span>" : o.k === "wr" ? w + "%" : '<span class="neg">' + rTxt(q.dd) + "</span>";
+          return '<td class="r" style="' + (q.R === best ? "box-shadow:inset 0 0 0 1px rgba(127,217,154,.6)" : "") + '" title="' + q.n + " trades · " + q.W + "W " + q.L + "L · win rate " + w + "% · " + rTxt(q.R) + " after spread · drawdown " + rTxt(q.dd) + '">' + main + "</td>";
+        }).join("") + "</tr>";
+      }).join("") + "</tbody></table></div>";
+    return '<span class="eyebrow">SL SIZE AND TP TEST · ' + (per === "all" ? "ALL YEARS" : per) + "</span>" +
+      '<div class="note" style="font-size:12px">' + esc(G.note) + " Green outline = most R. Hover a box for the full numbers.</div>" +
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><span class="note" style="font-size:12px">SL buffer</span><div class="chips">' + bufs.map(function (b) { return chip("buf", b, b + "x ATR"); }).join("") + '</div><div class="chips">' +
+      chip("k", "R", "R after spread") + chip("k", "wr", "Win rate") + chip("k", "dd", "Drawdown") + "</div></div>" + tbl;
   }
 
   // ---------- shared bits ----------
@@ -153,12 +182,12 @@
   }
   function yearsTable(L) {
     var ys = years();
-    return '<div class="scroll-x"><table style="min-width:620px"><thead><tr><th>Year</th><th class="r">Trades</th><th class="r">W / RF / L</th><th class="r">Win rate</th><th class="r">Total R</th><th class="r">Pips</th><th class="r">Drawdown</th><th class="r">Positive months</th></tr></thead><tbody>' +
+    return '<div class="scroll-x"><table style="min-width:620px"><thead><tr><th>Year</th><th class="r">Trades</th><th class="r">W / RF / L</th><th class="r">Win rate</th><th class="r">Total R</th><th class="r">After spread</th><th class="r">Pips</th><th class="r">Drawdown</th><th class="r">Positive months</th></tr></thead><tbody>' +
       ys.map(function (y) {
         var T = inPeriod(L, y), R = sumR(T);
         if (!T.length) return "";
         return '<tr><td><button class="chip" data-sdy="' + y + '">' + y + '</button></td><td class="r">' + T.length + '</td><td class="r muted">' + count(T, "TP") + " / " + count(T, "BE") + " / " + count(T, "SL") + '</td><td class="r">' + wr(T) + '</td><td class="r ' + cls(R) + '" style="font-weight:600">' + rTxt(R) +
-          '</td><td class="r ' + cls(pips(T)) + '">' + (pips(T) != null ? pTxt(pips(T)) : "—") + '</td><td class="r neg">' + rTxt(drawdown(T)) + '</td><td class="r">' + posMonths(T) + "</td></tr>";
+          (net(T) != null ? '</td><td class="r ' + cls(net(T)) + '" style="font-weight:600">' + rTxt(net(T)) : '</td><td class="r">—') + '</td><td class="r ' + cls(pips(T)) + '">' + (pips(T) != null ? pTxt(pips(T)) : "—") + '</td><td class="r neg">' + rTxt(drawdown(T)) + '</td><td class="r">' + posMonths(T) + "</td></tr>";
       }).join("") + "</tbody></table></div>";
   }
 
@@ -202,7 +231,7 @@
     var tiles = '<div class="tiles">' + tile("Worst drawdown", rTxt(drawdown(L)), "neg") + tile("Longest losing run", loseRun(L)) + tile("Losses", count(L, "SL"), "neg") +
       tile("Loss rate", L.length ? Math.round((count(L, "SL") / L.length) * 1000) / 10 + "%" : "—") +
       (med != null ? tile("Typical SL", med + " pips") + tile("Smallest / biggest SL", rp[0] + " / " + rp[rp.length - 1] + " pips") : "") + "</div>";
-    var sl = slTest(S.scan, S.rmYear);
+    var sl = slGrid(S.scan, S.rmYear) || slTest(S.scan, S.rmYear);
     return yearChips(S.rmYear, "rmy") + card(verHead("RISK · " + (S.rmYear === "all" ? "ALL YEARS" : S.rmYear)) + tiles) +
       (sl ? card(sl) : card('<div class="note">No SL size test for this scanner on ' + esc(S.mkt) + " yet.</div>", 8));
   }
@@ -260,7 +289,7 @@
       var ms = scanMarkets(s[0]);
       var lines = ms.length ? ms.map(function (m) {
         var x = I[m][s[0]];
-        return '<span style="display:flex;justify-content:space-between;gap:10px;font-size:13px"><span>' + m + ' <span class="muted" style="font-size:11px">' + esc(x.from + " to " + x.to) + '</span></span><span class="' + cls(x.R) + '" style="font-weight:600;white-space:nowrap">' + rTxt(x.R) + ' <span class="muted" style="font-weight:400">· ' + x.wr + "%</span></span></span>";
+        return '<span style="display:flex;justify-content:space-between;gap:10px;font-size:13px"><span>' + m + ' <span class="muted" style="font-size:11px">' + esc(x.from + " to " + x.to) + '</span></span><span class="' + cls(x.R) + '" style="font-weight:600;white-space:nowrap">' + rTxt(x.R) + (x.net ? ' <span class="muted" style="font-weight:400">after spread</span>' : "") + ' <span class="muted" style="font-weight:400">· ' + x.wr + "% wins</span></span></span>";
       }).join("") : '<span class="note" style="font-size:12px">Not tested yet.</span>';
       return '<button class="card pad sdm-mcard" data-sdscan="' + s[0] + '"' + (ms.length ? "" : ' style="opacity:.55"') + '><span class="eyebrow">SCANNER</span><span style="font:700 24px var(--sg)">' + esc(s[1]) + "</span>" +
         '<span style="display:flex;flex-direction:column;gap:6px;margin-top:4px">' + lines + "</span>" + (ms.length ? '<span class="btn btn-ghost" style="align-self:flex-start;margin-top:8px">Open ' + esc(s[1]) + "</span>" : "") + "</button>";
@@ -270,12 +299,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=3", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=4", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=3", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=4", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
@@ -298,6 +327,7 @@
     $$("[data-sdback]", page).forEach(function (b) { b.onclick = function () { S.month = null; redraw(); }; });
     $$("[data-sdl]", page).forEach(function (b) { b.onclick = function () { S.openList[b.dataset.sdl] = !S.openList[b.dataset.sdl]; redraw(); }; });
     $$("[data-pls]", page).forEach(function (b) { b.onclick = function () { S.plSort = b.dataset.pls; redraw(); }; });
+    $$("[data-gro]", page).forEach(function (b) { b.onclick = function () { S.gr[b.dataset.gro] = b.dataset.grv; redraw(); }; });
     $$("[data-slo]", page).forEach(function (b) { b.onclick = function () { var g = b.dataset.slo, v = b.dataset.slv; S.sl[g] = g === "rf" ? +v : v; redraw(); }; });
     $$("[data-sdv]", page).forEach(function (sel) { sel.onchange = function () { S.ver[sel.dataset.sdv + S.mkt] = sel.value; redraw(); }; });
     $$("[data-sdstep]", page).forEach(function (b) {
