@@ -915,6 +915,7 @@
 
   // ======================= ADMIN =======================
   var AD = { list: null, filter: "all", msg: "" };
+  window.SDX_EDU = EDU;
   async function adminCall(path, body) {
     var tok = (await X().sb.auth.getSession()).data.session;
     var r = await fetch(window.SDX_CONFIG.AUTH_URL + path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (tok ? tok.access_token : "") }, body: body ? JSON.stringify(body) : undefined });
@@ -930,7 +931,7 @@
     var L = AD.list || [];
     var count = function (f) { return L.filter(f).length; };
     var shown = L.filter(function (m) { return AD.filter === "all" || (AD.filter === "active" ? m.active : AD.filter === "revoked" ? !m.active : AD.filter === "under" ? (m.active && m.balance != null && m.balance < 500) : m.plan === AD.filter); });
-    page.innerHTML = head("ADMIN", "Admin", "portal.", "Everyone with access to the dashboard. Revoking someone also removes them from the Telegram channel.") +
+    page.innerHTML = head("ADMIN", "Admin", "portal.", "Everyone with access to the dashboard. Revoking someone also removes them from the Telegram channel.") + (window.SDX_ADMIN ? window.SDX_ADMIN.tabs() : "") +
       '<div class="tiles" style="padding:6px 0;border-bottom:1px solid #18181a">' + tileH("Members", L.length) + tileH("Active", count(function (m) { return m.active; }), "pos") + tileH("Revoked", count(function (m) { return !m.active; }), "neg") + tileH("Total account size", money(L.reduce(function (a, m) { return a + (m.active && m.balance ? m.balance : 0); }, 0))) + tileH("Under $500", count(function (m) { return m.active && m.balance != null && m.balance < 500; }), "neg") + tileH("No balance set", count(function (m) { return m.active && m.plan !== "Admin" && m.balance == null; })) + "</div>" +
       '<div class="chips">' + [["all", "All"], ["active", "Active"], ["under", "Under $500"], ["revoked", "Revoked"], ["Trade Service", "Trade Service"], ["Elite Pack", "Elite Pack"]].map(function (f) { return '<button class="chip' + (f[0] === AD.filter ? " on" : "") + '" data-af="' + esc(f[0]) + '">' + f[1] + "</button>"; }).join("") + "</div>" +
       (AD.msg ? '<div class="note">' + esc(AD.msg) + "</div>" : "") +
@@ -942,6 +943,7 @@
         return '<tr' + (low && m.active ? ' style="background:rgba(255,92,92,.05)"' : "") + '><td style="font-weight:600">' + esc(m.name || m.email) + "</td><td>" + tgCell + "</td><td>" + esc(m.plan || "") + '</td><td class="r" style="font-family:var(--sg);font-weight:700;' + (low ? "color:#ff8a8a" : "") + '">' + (m.balance != null ? money(m.balance) : '<span class="muted" style="font-weight:400;font-family:Inter">Not set</span>') + (low ? '<div style="font-size:10px;font-family:Inter;font-weight:600;letter-spacing:.06em">UNDER $500</div>' : "") + '</td><td class="r muted">' + (m.start_balance != null ? money(m.start_balance) : "—") + '</td><td class="muted">' + (m.created_at ? new Date(m.created_at).toLocaleDateString("en-GB") : "") + '</td><td><span class="pill ' + (m.active ? "win" : "loss") + '">' + (m.active ? "Active" : "Revoked") + '</span></td><td class="r">' + (m.plan === "Admin" ? '<span class="muted" style="font-size:12px">You</span>' : '<button class="chip" data-acc="' + esc(m.email) + '" data-to="' + (m.active ? "revoke" : "restore") + '" style="min-height:32px;' + (m.active ? "color:#ff8a8a;border-color:rgba(255,138,138,.4)" : "") + '">' + (m.active ? "Revoke access" : "Restore") + "</button>") + "</td></tr>";
       }).join("") + "</tbody></table></div>" + (shown.length ? "" : '<div class="note" style="padding:30px;text-align:center">No members here.</div>') + "</section>" +
       (AD.confirm ? '<div class="modal-wrap"><section class="modal" style="max-width:460px"><div style="font-family:var(--sg);font-size:22px;font-weight:600">' + (AD.confirm.to === "revoke" ? "Revoke access?" : "Restore access?") + '</div><div class="note">' + (AD.confirm.to === "revoke" ? esc(AD.confirm.name) + " will lose access to the dashboard and be removed from the Telegram channel." : esc(AD.confirm.name) + " will get dashboard access back and be able to rejoin the Telegram channel.") + '</div><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn btn-ghost" id="cNo">Cancel</button><button class="btn btn-metal" id="cYes">' + (AD.confirm.to === "revoke" ? "Revoke" : "Restore") + "</button></div></section></div>" : "");
+    if (window.SDX_ADMIN) window.SDX_ADMIN.wire(page);
     $$("[data-af]", page).forEach(function (b) { b.onclick = function () { AD.filter = b.dataset.af; drawAdmin(page); }; });
     $$("[data-acc]", page).forEach(function (b) { b.onclick = function () { var m = L.filter(function (x) { return x.email === b.dataset.acc; })[0]; AD.confirm = { email: m.email, name: m.name || m.email, to: b.dataset.to }; drawAdmin(page); }; });
     if (AD.confirm) {
@@ -955,4 +957,5 @@
       };
     }
   }
+  window.SDX_ADMIN_CORE = { AD: AD, call: adminCall, drawAccess: drawAdmin };
 })();
