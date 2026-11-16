@@ -197,7 +197,15 @@
     var el = $("#tSel", page); if (!el) return; var g = sigOn();
     if (!g) { el.innerHTML = '<div class="note" style="font-size:12px">Tap a signal on the right to see its levels here and load the pair on the chart.</div>'; return; }
     var st = ST[g.status] || ST.waiting;
-    el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><div style="font:600 15px var(--sg)">' + esc(g.symbol) + " · " + esc(g.tf) + " · " + (g.side === "buy" ? "Buy" : "Sell") + '</div><span class="tag" style="background:' + st[1] + ";color:" + st[2] + '">' + st[0] + "</span></div>" + levelsCard(g);
+    el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><div style="font:600 15px var(--sg)">' + esc(g.symbol) + " · " + esc(g.tf) + " · " + (g.side === "buy" ? "Buy" : "Sell") + '</div><span class="tag" style="background:' + st[1] + ";color:" + st[2] + '">' + st[0] + "</span></div>" + levelsCard(g) + openWith(g);
+  }
+  function openWith(g) {
+    var sc = scById(g.scanner) || scById(T.sc), rq = reqFor(sc.id), has = rq && rq.data.status === "added";
+    var tfm = { M1: "1", M5: "5", M15: "15", "1H": "60", H1: "60", "4H": "240", H4: "240" }[String(g.tf).toUpperCase()] || T.tf;
+    var url = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(tvSym(g.symbol)) + "&interval=" + tfm;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px">' +
+      '<div class="note" style="font-size:12px;max-width:440px">' + (has ? "Opens your TradingView on " + esc(g.symbol) + " " + esc(g.tf) + ". Add " + esc(sc.name) + " to the chart once and it stays there." : "You need access to " + esc(sc.name) + " on TradingView to see this trade drawn on the chart. Request it in the Get it on TradingView tab below.") + "</div>" +
+      '<a class="btn ' + (has ? "btn-metal" : "btn-ghost") + '" target="_blank" rel="noopener" href="' + url + '" style="height:38px;font-size:13px">Open with ' + esc(sc.name) + "</a></div>";
   }
   function drawSide(page) {
     var el = $("#tSide", page); if (!el) return;
