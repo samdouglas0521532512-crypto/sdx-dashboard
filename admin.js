@@ -204,9 +204,9 @@
   // ---------- page ----------
   function draw(page) {
     if (S.tab === "access") { C().drawAccess(page); return; }
-    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack.", scandata: "Backtest results for every scanner. Pick a year, then tap a month." }[S.tab];
+    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack.", scandata: "Backtest results for every scanner. All years compares every version tested. Pick a year, then tap a month." }[S.tab];
     page.innerHTML = head(sub) + tabs() + (S.msg ? '<div class="note">' + esc(S.msg) + "</div>" : "") +
-      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : S.tab === "scandata" ? window.SDX_ADMIN_SCANDATA.render() : scannersTab()) + (S.open ? detail() : "");
+      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : S.tab === "scandata" ? window.SDX_ADMIN_SCANDATA.render(function () { if (S.tab === "scandata") draw(page); }) : scannersTab()) + (S.open ? detail() : "");
     wire(page);
     if (S.tab === "scandata") window.SDX_ADMIN_SCANDATA.wire(page, function () { draw(page); });
     wireImport(page);
