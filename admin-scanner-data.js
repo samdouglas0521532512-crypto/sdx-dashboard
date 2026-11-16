@@ -9,11 +9,11 @@
   var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"]];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { mkt: "XAUUSD", sl: { e: "close", rf: 0.25, k: "R" }, year: "2025", month: null, openList: {}, ver: {}, loading: false, failed: false };
+  var S = { mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", month: null, openList: {}, ver: {}, loading: false, failed: false };
 
-  function data() { return window.SDX_SCANNER_DATA || {}; }
-  function markets() { var m = {}; Object.keys(data()).forEach(function (k) { Object.keys(data()[k].markets || {}).forEach(function (x) { m[x] = 1; }); }); return Object.keys(m).sort().reverse(); }
-  function D(key) { var d = data()[key]; return d && d.markets ? d.markets[S.mkt] || null : null; }
+  function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
+  function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
+  function D(key) { return data()[key] || null; }
   function versions(key) { var d = D(key); return d ? d.versions : []; }
   function curVer(key) {
     var d = D(key); if (!d) return null;
@@ -27,14 +27,15 @@
   }
   function trades(key, y, m) { var v = curVer(key); return v ? inPeriod(v.trades, y, m) : []; }
   function allTrades(y, m) { var out = []; SCANNERS.forEach(function (s) { out = out.concat(trades(s[0], y, m)); }); return out; }
-  function r(t) { return RV[t[5]]; }
+  function r(t) { return t[6] != null ? t[6] : RV[t[5]]; }
   function sumR(L) { return Math.round(L.reduce(function (a, t) { return a + r(t); }, 0) * 10) / 10; }
-  function rTxt(x) { return (x > 0 ? "+" : "") + x + "R"; }
+  function rTxt(x) { x = Math.round(x * 100) / 100; return (x > 0 ? "+" : "") + x + "R"; }
   function cls(x) { return x > 0 ? "pos" : x < 0 ? "neg" : ""; }
-  function count(L, res) { return L.filter(function (t) { return t[5] === res; }).length; }
+  function count(L, res) { return L.filter(function (t) { var x = r(t); return res === "TP" ? x > 0 : res === "BE" ? x === 0 : x < 0; }).length; }
+  function tpHits(L) { var h = [0, 0, 0]; L.forEach(function (t) { var i = ["TP1", "TP2", "TP3"].indexOf(t[5]); if (i > -1) h[i]++; }); return h; }
   function wr(L) { var w = count(L, "TP"), l = count(L, "SL"); return w + l ? Math.round((w / (w + l)) * 1000) / 10 + "%" : "—"; }
   function drawdown(L) { var eq = 0, pk = 0, dd = 0; L.forEach(function (t) { eq += r(t); pk = Math.max(pk, eq); dd = Math.min(dd, eq - pk); }); return dd; }
-  function loseRun(L) { var run = 0, best = 0; L.forEach(function (t) { run = t[5] === "SL" ? run + 1 : 0; best = Math.max(best, run); }); return best; }
+  function loseRun(L) { var run = 0, best = 0; L.forEach(function (t) { run = r(t) < 0 ? run + 1 : 0; best = Math.max(best, run); }); return best; }
   function posMonths(L) {
     var m = {}; L.forEach(function (t) { var k = t[0].slice(0, 7); m[k] = (m[k] || 0) + r(t); });
     var ks = Object.keys(m); return ks.filter(function (k) { return m[k] > 0; }).length + "/" + ks.length;
@@ -44,6 +45,7 @@
   function stats(L, extra) {
     return '<div class="tiles">' + tile("Trades", L.length) + tile("Wins", count(L, "TP"), "pos") + tile("Risk free", count(L, "BE")) + tile("Losses", count(L, "SL"), "neg") +
       tile("Win rate (W vs L)", wr(L)) + tile("Total R", rTxt(sumR(L)), cls(sumR(L))) +
+      (tpHits(L)[0] ? tile("Closed at TP1 / TP2 / TP3", tpHits(L).join(" / ")) : "") +
       (extra ? tile("Worst drawdown", rTxt(drawdown(L)), "neg") + tile("Longest losing run", loseRun(L)) + tile("Positive months", posMonths(L)) + tile("Trades per week", weeks(L)) : "") + "</div>";
   }
   function years() {
@@ -167,7 +169,7 @@
   function tradeList(T) {
     return '<div class="scroll-x"><table style="min-width:560px;margin-top:6px"><thead><tr><th>Date</th><th>Time</th><th>Side</th><th class="r">Entry</th><th class="r">SL</th><th class="r">TP</th><th>Result</th><th class="r">R</th></tr></thead><tbody>' +
       T.map(function (t) {
-        var res = t[5] === "TP" ? "Win" : t[5] === "BE" ? "Risk free" : "Loss";
+        var res = { TP: "Win", BE: "Risk free", SL: "Loss", TP1: "TP1, then entry", TP2: "TP2, then entry", TP3: "All 3 TPs" }[t[5]] || t[5];
         return '<tr><td class="muted">' + esc(new Date(t[0].slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })) + '</td><td class="muted">' + esc(t[0].slice(11, 16)) + "</td><td>" + (t[1] === 1 ? "BUY" : "SELL") +
           '</td><td class="r">' + t[2] + '</td><td class="r">' + t[3] + '</td><td class="r">' + t[4] + "</td><td>" + res + '</td><td class="r ' + cls(r(t)) + '">' + rTxt(r(t)) + "</td></tr>";
       }).join("") + "</tbody></table></div>";
@@ -191,29 +193,42 @@
       card('<span class="eyebrow">' + MONTHS[m].toUpperCase() + " " + y + " · ALL SCANNERS</span>" + stats(L)) + cards;
   }
 
+  function load(src, key, redraw) {
+    if (S.loadingM[key]) return;
+    S.loadingM[key] = true;
+    var sc = document.createElement("script");
+    sc.src = src;
+    sc.onload = function () { S.loadingM[key] = false; if (redraw) redraw(); };
+    sc.onerror = function () { S.loadingM[key] = false; S.failed = true; if (redraw) redraw(); };
+    document.head.appendChild(sc);
+  }
+  function landing() {
+    var I = window.SDX_SCANDATA_INDEX;
+    return '<div class="sdm-mk">' + Object.keys(I).map(function (m) {
+      var sc = I[m], ks = Object.keys(sc), first = sc[ks[0]];
+      return '<button class="card pad sdm-mcard" data-sdk="' + m + '"><span class="eyebrow">MARKET</span><span style="font:700 30px var(--sg);letter-spacing:.02em">' + m + "</span>" +
+        '<span class="note" style="font-size:12px">' + esc(first.from + " to " + first.to) + " · " + ks.length + " scanner" + (ks.length === 1 ? "" : "s") + " tested</span>" +
+        '<span style="display:flex;flex-direction:column;gap:6px;margin-top:6px">' + ks.map(function (k) {
+          var x = sc[k], nm = (SCANNERS.filter(function (s) { return s[0] === k; })[0] || [k, k])[1];
+          return '<span style="display:flex;justify-content:space-between;gap:10px;font-size:13px"><span>' + esc(nm) + ' <span class="muted" style="font-size:11px">' + esc(x.name) + '</span></span><span class="' + cls(x.R) + '" style="font-weight:600;white-space:nowrap">' + rTxt(x.R) + ' <span class="muted" style="font-weight:400">· ' + x.wr + "%</span></span></span>";
+        }).join("") + '</span><span class="btn btn-ghost" style="align-self:flex-start;margin-top:8px">Open ' + m + " data</span></button>";
+    }).join("") + "</div>";
+  }
   function render(redraw) {
-    if (!window.SDX_SCANNER_DATA) {
-      if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-      if (!S.loading) {
-        S.loading = true;
-        var sc = document.createElement("script");
-        sc.src = "scanner-data.js?v=4";
-        sc.onload = function () { S.loading = false; if (redraw) redraw(); };
-        sc.onerror = function () { S.loading = false; S.failed = true; if (redraw) redraw(); };
-        document.head.appendChild(sc);
-      }
-      return '<div class="note">Loading scanner results…</div>';
-    }
+    if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=1", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!S.mkt) return landing();
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=1", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (!ys.length) return '<div class="note">No scanner results yet.</div>';
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     return '<div style="display:flex;flex-direction:column;gap:16px">' +
-      '<div class="chips">' + markets().map(function (m) { return '<button class="chip' + (S.mkt === m ? " on" : "") + '" data-sdk="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
+      '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="btn btn-ghost" data-sdk="">All markets</button><span style="font:700 22px var(--sg)">' + esc(S.mkt) + "</span></div>" +
       '<div class="chips">' + [["all", "All years"]].concat(ys.map(function (y) { return [y, y]; })).map(function (y) { return '<button class="chip' + (S.year === y[0] ? " on" : "") + '" data-sdy="' + y[0] + '">' + y[1] + "</button>"; }).join("") + "</div>" +
       (S.year === "all" ? allView() : S.month == null ? yearView() : monthView()) + "</div>";
   }
   function wire(page, redraw) {
-    $$("[data-sdk]", page).forEach(function (b) { b.onclick = function () { S.mkt = b.dataset.sdk; redraw(); }; });
+    $$("[data-sdk]", page).forEach(function (b) { b.onclick = function () { S.mkt = b.dataset.sdk || null; S.month = null; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-sdy]", page).forEach(function (b) { b.onclick = function () { S.year = b.dataset.sdy; S.month = null; redraw(); }; });
     $$("[data-sdm]", page).forEach(function (b) { b.onclick = function () { S.month = +b.dataset.sdm; S.openList = {}; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-sdback]", page).forEach(function (b) { b.onclick = function () { S.month = null; redraw(); }; });
