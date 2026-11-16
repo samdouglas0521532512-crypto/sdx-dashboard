@@ -9,7 +9,7 @@
   var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"]];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", month: null, openList: {}, ver: {}, loading: false, failed: false };
+  var S = { plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", month: null, openList: {}, ver: {}, loading: false, failed: false };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -32,6 +32,8 @@
   function rTxt(x) { x = Math.round(x * 100) / 100; return (x > 0 ? "+" : "") + x + "R"; }
   function cls(x) { return x > 0 ? "pos" : x < 0 ? "neg" : ""; }
   function count(L, res) { return L.filter(function (t) { var x = r(t); return res === "TP" ? x > 0 : res === "BE" ? x === 0 : x < 0; }).length; }
+  function pips(L) { var any = false, x = L.reduce(function (a, t) { if (t[7] != null) { any = true; return a + r(t) * t[7]; } return a; }, 0); return any ? Math.round(x) : null; }
+  function pTxt(x) { return (x > 0 ? "+" : "") + x.toLocaleString("en-GB") + " pips"; }
   function tpHits(L) { var h = [0, 0, 0]; L.forEach(function (t) { var i = ["TP1", "TP2", "TP3"].indexOf(t[5]); if (i > -1) h[i]++; }); return h; }
   function wr(L) { var w = count(L, "TP"), l = count(L, "SL"); return w + l ? Math.round((w / (w + l)) * 1000) / 10 + "%" : "—"; }
   function drawdown(L) { var eq = 0, pk = 0, dd = 0; L.forEach(function (t) { eq += r(t); pk = Math.max(pk, eq); dd = Math.min(dd, eq - pk); }); return dd; }
@@ -45,7 +47,8 @@
   function stats(L, extra) {
     return '<div class="tiles">' + tile("Trades", L.length) + tile("Wins", count(L, "TP"), "pos") + tile("Risk free", count(L, "BE")) + tile("Losses", count(L, "SL"), "neg") +
       tile("Win rate (W vs L)", wr(L)) + tile("Total R", rTxt(sumR(L)), cls(sumR(L))) +
-      (tpHits(L)[0] ? tile("Closed at TP1 / TP2 / TP3", tpHits(L).join(" / ")) : "") +
+      (pips(L) != null ? tile("Total pips", pTxt(pips(L)), cls(pips(L))) : "") +
+      (tpHits(L)[0] ? tile("Reached TP1 / TP2 / TP3", tpHits(L).join(" / ")) : "") +
       (extra ? tile("Worst drawdown", rTxt(drawdown(L)), "neg") + tile("Longest losing run", loseRun(L)) + tile("Positive months", posMonths(L)) + tile("Trades per week", weeks(L)) : "") + "</div>";
   }
   function years() {
@@ -71,12 +74,12 @@
       if (L.length && (best === null || R > best)) best = R;
       return { v: v, L: L, R: R };
     });
-    var hd = "<th>Version</th><th class=\"r\">Trades</th><th class=\"r\">W / RF / L</th><th class=\"r\">Win rate</th><th class=\"r\">Total R</th>" + (full ? '<th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">Positive months</th>' : "");
+    var hd = "<th>Version</th><th class=\"r\">Trades</th><th class=\"r\">W / RF / L</th><th class=\"r\">Win rate</th><th class=\"r\">Total R</th><th class=\"r\">Pips</th>" + (full ? '<th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">Positive months</th>' : "");
     return '<div class="scroll-x"><table style="min-width:' + (full ? 820 : 520) + 'px"><thead><tr>' + hd + "</tr></thead><tbody>" +
       rows.map(function (x) {
         var L = x.L, on = x.v.id === cur, top = L.length && x.R === best;
         return '<tr style="' + (on ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x.v.name) + (top ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") + (on ? ' <span class="muted" style="font-size:11px">· showing</span>' : "") + "</td>" +
-          '<td class="r">' + L.length + '</td><td class="r muted">' + count(L, "TP") + " / " + count(L, "BE") + " / " + count(L, "SL") + '</td><td class="r">' + wr(L) + '</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (L.length ? rTxt(x.R) : "—") + "</td>" +
+          '<td class="r">' + L.length + '</td><td class="r muted">' + count(L, "TP") + " / " + count(L, "BE") + " / " + count(L, "SL") + '</td><td class="r">' + wr(L) + '</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (L.length ? rTxt(x.R) : "—") + '</td><td class="r ' + cls(pips(L)) + '">' + (L.length && pips(L) != null ? pTxt(pips(L)) : "—") + "</td>" +
           (full ? '<td class="r neg">' + rTxt(drawdown(L)) + '</td><td class="r">' + loseRun(L) + '</td><td class="r">' + posMonths(L) + "</td>" : "") + "</tr>";
       }).join("") + "</tbody></table></div>";
   }
@@ -120,6 +123,23 @@
       '</div><div class="chips">' + chip("k", "R", "Total R") + chip("k", "wr", "Win rate") + chip("k", "dd", "Drawdown") + "</div></div>" + tbl;
   }
 
+  // ---------- management plans ----------
+  function plansTable(key) {
+    var d = D(key), P = d && d.plans; if (!P) return "";
+    var cur = curVer(key), k = S.plSort;
+    var rows = P.rows.slice().sort(function (a, b) { return k === "R" ? b[3] - a[3] : k === "pips" ? b[4] - a[4] : k === "win" ? b[5] - a[5] || b[3] - a[3] : b[6] - a[6] || b[3] - a[3]; });
+    var inUse = function (x) { return cur && cur.id.indexOf("plan") > -1 && cur.settings.indexOf("TP3 " + x[0].split("/")[2] + "R") > -1 && x[0].indexOf("0.25/0.5/") === 0 && x[1] === "20/30/50" && x[2].indexOf("to TP1 at TP2") > -1; };
+    function chip(v, label) { return '<button class="chip' + (k === v ? " on" : "") + '" data-pls="' + v + '">' + label + "</button>"; }
+    return '<span class="eyebrow" style="margin-top:6px">MANAGEMENT PLANS · ALL YEARS</span><div class="note" style="font-size:12px">' + esc(P.note) + "</div>" +
+      '<div class="chips">' + chip("R", "Most R") + chip("pips", "Most pips") + chip("win", "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
+      '<div class="scroll-x"><table style="min-width:760px"><thead><tr><th>TP1 / TP2 / TP3 (R)</th><th>Split %</th><th>Stop</th><th class="r">Total R</th><th class="r">Pips</th><th class="r">In profit</th><th class="r">Drawdown</th></tr></thead><tbody>' +
+      rows.map(function (x) {
+        var on = inUse(x);
+        return '<tr style="' + (on ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x[0]) + (on ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + "</td><td>" + esc(x[1]) + '</td><td class="muted">' + esc(x[2]) + '</td><td class="r ' + cls(x[3]) + '" style="font-weight:600">' + rTxt(x[3]) +
+          '</td><td class="r ' + cls(x[4]) + '">' + pTxt(x[4]) + '</td><td class="r">' + x[5] + '%</td><td class="r neg">' + rTxt(x[6]) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+
   // ---------- all years ----------
   function allView() {
     var parts = card('<span class="eyebrow">ALL YEARS · ALL SCANNERS</span><div class="note" style="font-size:12px">Uses the version picked for each scanner below.</div>' + stats(allTrades("all"), true));
@@ -130,7 +150,7 @@
       var v = curVer(s[0]);
       parts += card(head + '<div class="note" style="font-size:12px">' + esc(S.mkt + " · " + d.from + " to " + d.to + " · " + v.settings) + "</div>" + stats(v.trades, true) +
         '<span class="eyebrow" style="margin-top:6px">EVERY VERSION TESTED</span>' + compare(s[0], "all", null, true) +
-        '<span class="eyebrow" style="margin-top:6px">EACH YEAR</span>' + yearByYear(s[0]) + slTest(s[0], "all"));
+        '<span class="eyebrow" style="margin-top:6px">EACH YEAR</span>' + yearByYear(s[0]) + plansTable(s[0]) + slTest(s[0], "all"));
     });
     return parts;
   }
@@ -167,11 +187,11 @@
     return '<div class="jcal">' + html + "</div>";
   }
   function tradeList(T) {
-    return '<div class="scroll-x"><table style="min-width:560px;margin-top:6px"><thead><tr><th>Date</th><th>Time</th><th>Side</th><th class="r">Entry</th><th class="r">SL</th><th class="r">TP</th><th>Result</th><th class="r">R</th></tr></thead><tbody>' +
+    return '<div class="scroll-x"><table style="min-width:560px;margin-top:6px"><thead><tr><th>Date</th><th>Time</th><th>Side</th><th class="r">Entry</th><th class="r">SL</th><th class="r">TP</th><th>Result</th><th class="r">R</th><th class="r">Pips</th></tr></thead><tbody>' +
       T.map(function (t) {
-        var res = { TP: "Win", BE: "Risk free", SL: "Loss", TP1: "TP1, then entry", TP2: "TP2, then entry", TP3: "All 3 TPs" }[t[5]] || t[5];
+        var res = { TP: "Win", BE: "Risk free", SL: "Loss", TP1: "TP1 hit", TP2: "TP2 hit", TP3: "All TPs hit" }[t[5]] || t[5];
         return '<tr><td class="muted">' + esc(new Date(t[0].slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })) + '</td><td class="muted">' + esc(t[0].slice(11, 16)) + "</td><td>" + (t[1] === 1 ? "BUY" : "SELL") +
-          '</td><td class="r">' + t[2] + '</td><td class="r">' + t[3] + '</td><td class="r">' + t[4] + "</td><td>" + res + '</td><td class="r ' + cls(r(t)) + '">' + rTxt(r(t)) + "</td></tr>";
+          '</td><td class="r">' + t[2] + '</td><td class="r">' + t[3] + '</td><td class="r">' + t[4] + "</td><td>" + res + '</td><td class="r ' + cls(r(t)) + '">' + rTxt(r(t)) + '</td><td class="r ' + cls(r(t)) + '">' + (t[7] != null ? (r(t) * t[7] > 0 ? "+" : "") + Math.round(r(t) * t[7] * 10) / 10 : "—") + "</td></tr>";
       }).join("") + "</tbody></table></div>";
   }
   function monthView() {
@@ -216,9 +236,9 @@
   }
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=1", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=2", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.mkt) return landing();
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=1", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=2", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (!ys.length) return '<div class="note">No scanner results yet.</div>';
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
@@ -233,6 +253,7 @@
     $$("[data-sdm]", page).forEach(function (b) { b.onclick = function () { S.month = +b.dataset.sdm; S.openList = {}; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-sdback]", page).forEach(function (b) { b.onclick = function () { S.month = null; redraw(); }; });
     $$("[data-sdl]", page).forEach(function (b) { b.onclick = function () { S.openList[b.dataset.sdl] = !S.openList[b.dataset.sdl]; redraw(); }; });
+    $$("[data-pls]", page).forEach(function (b) { b.onclick = function () { S.plSort = b.dataset.pls; redraw(); }; });
     $$("[data-slo]", page).forEach(function (b) { b.onclick = function () { var g = b.dataset.slo, v = b.dataset.slv; S.sl[g] = g === "rf" ? +v : v; redraw(); }; });
     $$("[data-sdv]", page).forEach(function (sel) { sel.onchange = function () { S.ver[sel.dataset.sdv + S.mkt] = sel.value; redraw(); }; });
     $$("[data-sdstep]", page).forEach(function (b) {
