@@ -7,7 +7,7 @@
   function esc(s) { return window.SDX.esc(s); }
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
-  var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["trap", "Structure Trap"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"], ["mech", "Mech Model"], ["amsweep", "AM Sweep Model"], ["m1model", "M1 Model"]];
+  var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["trap", "Structure Trap"], ["keylv", "Gold Key Levels"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"], ["mech", "Mech Model"], ["amsweep", "AM Sweep Model"], ["m1model", "M1 Model"]];
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
@@ -331,12 +331,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=17", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=18", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=17", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=18", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
