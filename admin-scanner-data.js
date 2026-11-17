@@ -11,7 +11,7 @@
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { ovSec: {}, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
+  var S = { ovSec: {}, ovPg: {}, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -242,6 +242,24 @@
     function n(x) { var p = String(x).split(" "); return +p[1] * 12 + M3.indexOf(p[0]); }
     return (n(d.to) - n(d.from) + 1) / 12;
   }
+
+  function pgCell(v, t) {
+    if (v == null || v === "") return '<td class="r muted">—</td>';
+    if (t === "txt") return "<td>" + esc(v) + "</td>";
+    if (t === "R") return '<td class="r ' + cls(v) + '" style="font-weight:600">' + rTxt(v) + "</td>";
+    if (t === "neg") return '<td class="r neg">' + rTxt(v) + "</td>";
+    if (t === "pct") return '<td class="r">' + v + "%</td>";
+    return '<td class="r">' + esc(v) + "</td>";
+  }
+  function pgBlock(b) {
+    if (b.type === "head") return '<span class="eyebrow" style="margin-top:8px">' + esc(b.text.toUpperCase()) + "</span>";
+    if (b.type === "note") return '<div class="note" style="font-size:12px">' + esc(b.text) + "</div>";
+    if (b.type === "list") return '<ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5">' + b.items.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+    if (b.type === "tiles") return '<div class="tiles">' + b.items.map(function (x) { return tile(x[0], x[1], x[2]); }).join("") + "</div>";
+    if (b.type === "table") return '<div class="scroll-x"><table style="min-width:' + Math.max(520, b.cols.length * 95) + 'px"><thead><tr>' + b.cols.map(function (c, i) { return "<th" + (c[1] === "txt" ? "" : ' class="r"') + ">" + esc(c[0]) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      b.rows.map(function (r) { return "<tr>" + r.map(function (v, i) { return pgCell(v, b.cols[i][1]); }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+    return "";
+  }
   function overview() {
     var d = D(S.scan), O = d.overview, b = O.best;
     var tiles = '<div class="tiles">' + tile("Total R", rTxt(b.R), cls(b.R)) + tile("R a year (average)", rTxt(Math.round((b.R / Math.max(spanYears(d), 0.5)) * 10) / 10), cls(b.R)) + tile("Trades", b.n) +
@@ -250,10 +268,18 @@
     var cur = S.ovSec[S.scan] || O.sections[0].id, sec = O.sections.filter(function (x) { return x.id === cur; })[0] || O.sections[0];
     var chips = '<div class="chips">' + O.sections.map(function (x) { return '<button class="chip' + (x.id === sec.id ? " on" : "") + '" data-ovs="' + esc(x.id) + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
     var body = sec.rows ? ovTable(sec.rows) : sec.groups.map(function (g) { return '<span class="eyebrow" style="margin-top:8px">' + esc(g.name.toUpperCase()) + "</span>" + ovTable(g.rows); }).join("");
-    return card('<span class="eyebrow">BEST RESULTS · ' + esc(S.mkt + " · " + d.from + " to " + d.to) + '</span><span style="font:700 20px var(--sg)">' + esc(O.title) + '</span><div class="note" style="font-size:13px">' + esc(O.summary) + "</div>" + tiles + yt +
-        (O.version ? '<button class="btn btn-ghost" data-ovver="' + esc(O.version) + '" style="align-self:flex-start">See every trade</button>' : "")) +
-      card('<span class="eyebrow">CONFIRMATIONS</span><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5">' + O.rules.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>") +
-      card('<span class="eyebrow">WHAT HAPPENS IF YOU CHANGE IT · TAP A SECTION</span>' + chips + '<div class="note" style="font-size:12px">' + esc(sec.note) + ' Win rate = wins against losses only, breakevens left out. "In use" = what the model uses. "Best" = most R in that table. Stopped at entry = closed at 0R after the SL moved to entry.</div>' + body);
+    var bestCard = card('<span class="eyebrow">BEST RESULTS · ' + esc(S.mkt + " · " + d.from + " to " + d.to) + '</span><span style="font:700 20px var(--sg)">' + esc(O.title) + '</span><div class="note" style="font-size:13px">' + esc(O.summary) + "</div>" + tiles + yt +
+        (O.version ? '<button class="btn btn-ghost" data-ovver="' + esc(O.version) + '" style="align-self:flex-start">See every trade</button>' : ""));
+    var confCard = card('<span class="eyebrow">CONFIRMATIONS</span><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5">' + O.rules.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>");
+    var whatCard = card('<span class="eyebrow">WHAT HAPPENS IF YOU CHANGE IT · TAP A SECTION</span>' + chips + '<div class="note" style="font-size:12px">' + esc(sec.note) + ' Win rate = wins against losses only, breakevens left out. "In use" = what the model uses. "Best" = most R in that table. Stopped at entry = closed at 0R after the SL moved to entry.</div>' + body);
+    if (!O.pages) return bestCard + confCard + whatCard;
+    var P = [["sum", "Summary"]].concat(O.pages.map(function (x) { return [x.id, x.name]; })).concat([["what", "What if"]]);
+    var pg = S.ovPg[S.scan] || "sum";
+    var nav = '<div class="chips">' + P.map(function (x) { return '<button class="chip' + (x[0] === pg ? " on" : "") + '" data-ovp="' + esc(x[0]) + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
+    if (pg === "sum") return nav + bestCard;
+    if (pg === "what") return nav + whatCard;
+    var page = O.pages.filter(function (x) { return x.id === pg; })[0] || O.pages[0];
+    return nav + card('<span class="eyebrow">' + esc(page.name.toUpperCase()) + "</span>" + page.blocks.map(pgBlock).join(""));
   }
 
   // ---------- TRADE DATA ----------
@@ -364,12 +390,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=20", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=21", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=20", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=21", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
@@ -385,6 +411,7 @@
   }
   function wire(page, redraw) {
     $$("[data-sdscan]", page).forEach(function (b) { b.onclick = function () { S.scan = b.dataset.sdscan || null; S.month = null; S.sec = "overview"; redraw(); window.scrollTo(0, 0); }; });
+    $$("[data-ovp]", page).forEach(function (b) { b.onclick = function () { S.ovPg[S.scan] = b.dataset.ovp; redraw(); }; });
     $$("[data-ovs]", page).forEach(function (b) { b.onclick = function () { S.ovSec[S.scan] = b.dataset.ovs; redraw(); }; });
     $$("[data-ovver]", page).forEach(function (b) { b.onclick = function () { S.ver[S.scan + S.mkt] = b.dataset.ovver; S.sec = "trades"; S.year = "all"; S.month = null; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-sdsec]", page).forEach(function (b) { b.onclick = function () { S.sec = b.dataset.sdsec; redraw(); }; });
