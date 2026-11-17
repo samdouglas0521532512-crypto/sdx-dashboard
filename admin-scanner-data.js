@@ -158,8 +158,8 @@
     var rows = P.rows.slice().sort(function (a, b) { return k === "R" ? b[2] - a[2] : k === "pips" ? b[3] - a[3] : k === "win" ? b[4] - a[4] || b[2] - a[2] : b[5] - a[5] || b[2] - a[2]; });
     function chip(v, label) { return '<button class="chip' + (k === v ? " on" : "") + '" data-pls="' + v + '">' + label + "</button>"; }
     return '<span class="eyebrow">TRADE MANAGEMENT PLANS · ALL YEARS</span><div class="note" style="font-size:12px">' + esc(P.note) + "</div>" +
-      '<div class="chips">' + chip("R", "Most R after spread") + chip("pips", "Most pips") + chip("win", "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
-      '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Plan</th><th class="r">Total R</th><th class="r">After spread</th><th class="r">Pips</th><th class="r">In profit</th><th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">2022-24 after spread</th><th class="r">2025-26 after spread</th></tr></thead><tbody>' +
+      '<div class="chips">' + chip("R", "Most R after spread") + chip("pips", "Most pips") + chip("win", P.wl ? "Highest win rate" : "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
+      '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Plan</th><th class="r">Total R</th><th class="r">After spread</th><th class="r">Pips</th><th class="r">' + (P.wl ? "Win rate (W vs L)" : "In profit") + '</th><th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">2022-24 after spread</th><th class="r">2025-26 after spread</th></tr></thead><tbody>' +
       rows.map(function (x) {
         return '<tr style="' + (x[9] ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x[0]) + (x[9] ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + '</td><td class="r ' + cls(x[1]) + '">' + rTxt(x[1]) +
           '</td><td class="r ' + cls(x[2]) + '" style="font-weight:600">' + rTxt(x[2]) + '</td><td class="r ' + cls(x[3]) + '">' + pTxt(x[3]) + '</td><td class="r">' + x[4] + '%</td><td class="r neg">' + rTxt(x[5]) +
@@ -226,12 +226,13 @@
 
   // ---------- OVERVIEW: best results, confirmations, and what happens if you change one thing ----------
   var OVY = ["2022", "2023", "2024", "2025", "2026"];
+  function ovWr(x) { var l = 100 - x.win - x.rf; return x.win + l > 0 ? Math.round((x.win / (x.win + l)) * 1000) / 10 + "%" : "—"; }
   function ovTable(rows) {
-    return '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Option</th><th class="r">Trades</th><th class="r">Wins</th><th class="r">Stopped at entry</th><th class="r">Total R</th><th class="r">Drawdown</th><th class="r">Losing run</th>' +
+    return '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Option</th><th class="r">Trades</th><th class="r">Win rate (W vs L)</th><th class="r">Stopped at entry</th><th class="r">Total R</th><th class="r">Drawdown</th><th class="r">Losing run</th>' +
       OVY.map(function (y) { return '<th class="r">' + y + "</th>"; }).join("") + "</tr></thead><tbody>" +
       rows.map(function (x) {
         return '<tr style="' + (x.cur ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x.label) + (x.cur ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + (x.best ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") +
-          '</td><td class="r">' + x.n + '</td><td class="r">' + x.win + '%</td><td class="r muted">' + x.rf + '%</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (x.n ? rTxt(x.R) : "—") +
+          '</td><td class="r">' + x.n + '</td><td class="r">' + ovWr(x) + '</td><td class="r muted">' + x.rf + '%</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (x.n ? rTxt(x.R) : "—") +
           '</td><td class="r neg">' + rTxt(x.dd) + '</td><td class="r">' + x.run + "</td>" +
           x.years.map(function (v) { return '<td class="r ' + cls(v) + '">' + (v == null ? "—" : rTxt(v)) + "</td>"; }).join("") + "</tr>";
       }).join("") + "</tbody></table></div>";
@@ -244,7 +245,7 @@
   function overview() {
     var d = D(S.scan), O = d.overview, b = O.best;
     var tiles = '<div class="tiles">' + tile("Total R", rTxt(b.R), cls(b.R)) + tile("R a year (average)", rTxt(Math.round((b.R / Math.max(spanYears(d), 0.5)) * 10) / 10), cls(b.R)) + tile("Trades", b.n) +
-      tile("Wins", b.win + "%", "pos") + tile("Stopped at entry", b.rf + "%") + tile("Worst drawdown", rTxt(b.dd), "neg") + tile("Longest losing run", b.run) + "</div>";
+      tile("Win rate (W vs L)", ovWr(b), "pos") + tile("Stopped at entry", b.rf + "%") + tile("Worst drawdown", rTxt(b.dd), "neg") + tile("Longest losing run", b.run) + "</div>";
     var yt = '<div class="tiles">' + OVY.map(function (y, i) { var v = b.years[i]; return tile(y + (y === "2026" ? " (to " + d.to + ")" : ""), v == null ? "—" : rTxt(v), cls(v)); }).join("") + "</div>";
     var cur = S.ovSec[S.scan] || O.sections[0].id, sec = O.sections.filter(function (x) { return x.id === cur; })[0] || O.sections[0];
     var chips = '<div class="chips">' + O.sections.map(function (x) { return '<button class="chip' + (x.id === sec.id ? " on" : "") + '" data-ovs="' + esc(x.id) + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
@@ -252,7 +253,7 @@
     return card('<span class="eyebrow">BEST RESULTS · ' + esc(S.mkt + " · " + d.from + " to " + d.to) + '</span><span style="font:700 20px var(--sg)">' + esc(O.title) + '</span><div class="note" style="font-size:13px">' + esc(O.summary) + "</div>" + tiles + yt +
         (O.version ? '<button class="btn btn-ghost" data-ovver="' + esc(O.version) + '" style="align-self:flex-start">See every trade</button>' : "")) +
       card('<span class="eyebrow">CONFIRMATIONS</span><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5">' + O.rules.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>") +
-      card('<span class="eyebrow">WHAT HAPPENS IF YOU CHANGE IT · TAP A SECTION</span>' + chips + '<div class="note" style="font-size:12px">' + esc(sec.note) + ' "In use" = what the model uses. "Best" = most R in that table. Stopped at entry = closed at 0R after the SL moved to entry.</div>' + body);
+      card('<span class="eyebrow">WHAT HAPPENS IF YOU CHANGE IT · TAP A SECTION</span>' + chips + '<div class="note" style="font-size:12px">' + esc(sec.note) + ' Win rate = wins against losses only, breakevens left out. "In use" = what the model uses. "Best" = most R in that table. Stopped at entry = closed at 0R after the SL moved to entry.</div>' + body);
   }
 
   // ---------- TRADE DATA ----------
@@ -363,12 +364,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=19", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=20", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=19", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=20", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
