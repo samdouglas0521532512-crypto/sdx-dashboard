@@ -192,8 +192,8 @@
         var file = z.file("assets/" + k); if (!file) return;
         var blob = await file.async("blob");
         var ext = k.split(".").pop().toLowerCase(), type = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/" + ext;
-        var r = await sb().storage.from("journal").upload(base + k, blob, { upsert: true, contentType: type });
-        if (r.error && !/exists/i.test(r.error.message || "")) throw r.error;
+        var r = await sb().storage.from("journal").upload(base + k, blob, { upsert: false, contentType: type });
+        if (r.error && !/exist|duplicate/i.test(r.error.message || "")) throw new Error("Screenshot upload blocked (" + (r.error.message || r.error) + ")");
         urls[k] = sb().storage.from("journal").getPublicUrl(base + k).data.publicUrl;
         done++; say("Uploading screenshots… " + done + " of " + keys.length);
       }
@@ -214,7 +214,7 @@
       for (var j = 0; j < items.length; j += 25) {
         var batch = items.slice(j, j + 25).map(function (d, n) { return { user_id: uid(), kind: "notion", data: d, sort: j + n }; });
         var ins = await sb().from("journal_items").insert(batch);
-        if (ins.error) throw ins.error;
+        if (ins.error) throw new Error("Saving blocked (" + (ins.error.message || ins.error) + ")");
         say("Saving pages and tables… " + Math.min(j + 25, items.length) + " of " + items.length);
       }
       N = null;
