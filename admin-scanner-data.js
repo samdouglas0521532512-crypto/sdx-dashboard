@@ -1,4 +1,4 @@
-/* SDX Members Dashboard: Scanner data (admins only, under ADMIN in the menu)
+/* SDX Members Dashboard: Entry model data (admins only, under ADMIN in the menu)
    Pick a scanner, then: Trade data (all years / year calendar / month with every trade),
    Risk management (SL size test, risk numbers), Trade management (partial plans, every version tested).
    The results files only load when this page is opened. */
@@ -7,7 +7,7 @@
   function esc(s) { return window.SDX.esc(s); }
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
-  var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["trap", "Structure Trap"], ["keylv", "Gold Key Levels"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"], ["mech", "Mech Model"], ["amsweep", "AM Sweep Model"], ["m1model", "M1 Model"]];
+  var SCANNERS = [["chrome", "SDX Pulse"], ["platinum", "SDX Sniper"], ["titanium", "SDX Precision"], ["obsidian", "SDX Phantom"], ["trap", "Failed Break Model"], ["keylv", "Gold Key Levels"], ["cobalt", "SDX Raid"], ["iridium", "SDX Ghost"], ["mech", "Mech Model"], ["amsweep", "AM Sweep Model"], ["m1model", "M1 Model"]];
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
@@ -443,7 +443,7 @@
   window.SDX_PAGES = window.SDX_PAGES || {};
   window.SDX_PAGES.scandata = function (page) {
     function draw() {
-      page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">ADMIN</div><h1 class="title" style="margin:0">Scanner data.</h1><div class="note" style="font-size:13px">Backtest results for every scanner and model. Only admins can see this page.</div></div>' + render(draw);
+      page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">ADMIN</div><h1 class="title" style="margin:0">Entry model data.</h1><div class="note" style="font-size:13px">Backtest results for every scanner and model. Only admins can see this page.</div></div>' + render(draw);
       wire(page, draw);
     }
     draw();
