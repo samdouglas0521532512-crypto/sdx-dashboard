@@ -369,7 +369,90 @@
       }).join("");
   }
 
+  // ---------- Mech Model groups (Failed Break scanner signals, one group per pair) ----------
+  var MECH = [["GER30", "GER30 Mech", 1, 1], ["EURUSD", "EURUSD Mech", 0.0001, 5], ["GBPUSD", "GBPUSD Mech", 0.0001, 5], ["XAUUSD", "XAUUSD Mech", 0.1, 2]];
+  function mechPair(sym) {
+    var s = String(sym || "").toUpperCase();
+    if (s.indexOf("XAU") > -1 || s.indexOf("GOLD") > -1) return "XAUUSD";
+    if (s.indexOf("EURUSD") > -1) return "EURUSD";
+    if (s.indexOf("GBPUSD") > -1) return "GBPUSD";
+    if (/GER|DE30|DE40|DAX|GRXEUR/.test(s)) return "GER30";
+    return "";
+  }
+  async function loadMech() {
+    try {
+      var r = await sb.from("scanner_signals").select("*").eq("scanner", "trap").order("created_at", { ascending: true }).limit(1000);
+      state.mech = r.error ? [] : (r.data || []);
+    } catch (e) { state.mech = []; }
+    if (!state.mechChan) {
+      try {
+        state.mechChan = sb.channel("mech").on("postgres_changes", { event: "*", schema: "public", table: "scanner_signals" }, function () {
+          loadMech().then(function () { if (route() === "service" && state.svcGroup && state.svcGroup !== "ideas") renderShell(); });
+        }).subscribe();
+      } catch (e) { }
+    }
+  }
+  function mechFeed(pair) {
+    var cfg = MECH.filter(function (m) { return m[0] === pair; })[0], pip = cfg[2], dec = cfg[3];
+    var num = function (x) { return Number(x).toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec }); };
+    var pips = function (x) { return (Math.round(Math.abs(x) / pip * 100) / 100).toLocaleString("en-GB"); };
+    var rows = (state.mech || []).filter(function (g) { return mechPair(g.symbol) === pair; });
+    var ev = [], run = null;
+    rows.forEach(function (g) {
+      var e = +g.entry, sl = +g.sl, tp = +g.tp, rf = +g.rf, side = String(g.side || "").toUpperCase();
+      var head = esc(g.symbol) + " " + side + " NOW";
+      ev.push({ t: g.created_at, kind: "signal", tag: "NEW SIGNAL", tf: g.tf, text: head + "<br><br>@" + num(e) + "<br><br>SL " + num(sl) + " ( " + pips(e - sl) + " pips )<br><br>TP " + num(tp) + " ( " + pips(tp - e) + " pips )<br><br>Risk =1.5%" });
+      if (rf > 0) ev.push({ t: g.created_at, kind: "update", tag: "TRADE UPDATE", reply: head, text: "Risk free point @" + num(rf) });
+      var done = g.status === "tp" || g.status === "sl" || g.status === "be" || g.status === "cancelled";
+      if (g.rf_hit) ev.push({ t: done ? new Date(new Date(g.updated_at).getTime() - 1).toISOString() : g.updated_at, noTime: done, kind: "update", tag: "TRADE UPDATE", reply: head, text: "Risk free point hit ✅<br><br>Go risk free" });
+      if (g.status === "tp") ev.push({ t: g.updated_at, kind: "win", tag: "TAKE PROFIT", reply: head, text: "Take Profit Hit ✅<br><br>+" + (Math.round(Math.abs(tp - e) / Math.abs(e - sl) * 10) / 10) + "R Secured on this position" });
+      else if (g.status === "sl") ev.push({ t: g.updated_at, kind: "loss", tag: "STOP LOSS", reply: head, text: "Stop loss hit<br><br>-1R on this position" });
+      else if (g.status === "be") ev.push({ t: g.updated_at, kind: "be", tag: "BREAKEVEN", reply: head, text: "Breakeven<br><br>Closed at entry, no loss" });
+      else if (g.status === "cancelled") ev.push({ t: g.updated_at, kind: "update", tag: "CANCELLED", reply: head, text: "Trade cancelled" });
+      if (g.status === "triggered" || g.status === "waiting") run = head + " @" + num(e);
+    });
+    ev.forEach(function (m, k) { m.k = k; });
+    ev.sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : a.k - b.k; });
+    var lastDay = "", items = "";
+    ev.forEach(function (m) {
+      var dt = new Date(m.t);
+      var day = dt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" }).toUpperCase();
+      if (day !== lastDay) { items += '<div class="day">' + esc(day) + "</div>"; lastDay = day; }
+      var time = !m.noTime ? dt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }) : "";
+      items += '<div class="bubble k-' + m.kind + '"><div class="head"><span class="from metal-text">' + esc(cfg[1]) + (m.tf ? " · " + esc(String(m.tf)) : "") + '</span><span class="tag">' + m.tag + "</span></div>" +
+        (m.reply ? '<div class="reply"><b>Reply</b>' + m.reply + "</div>" : "") + '<div class="body">' + m.text + "</div>" + (time ? '<span class="time">' + time + "</span>" : "") + "</div>";
+    });
+    return { items: items, run: run, name: cfg[1] };
+  }
+  function svcTabs() {
+    var g = state.svcGroup || "ideas";
+    return '<div style="display:flex;flex-direction:column;gap:10px"><div class="tabs" style="flex-wrap:wrap"><button class="tab' + (g === "ideas" ? " on" : "") + '" data-svc="ideas">SDX Trade Ideas</button></div>' +
+      '<div class="eyebrow">MECH MODEL</div><div class="tabs" style="flex-wrap:wrap">' +
+      MECH.map(function (m) { return '<button class="tab' + (g === m[0] ? " on" : "") + '" data-svc="' + m[0] + '">' + m[1] + "</button>"; }).join("") + "</div></div>";
+  }
+  function bindSvc(page) {
+    page.querySelectorAll("[data-svc]").forEach(function (b) {
+      b.onclick = function () {
+        state.svcGroup = b.getAttribute("data-svc");
+        if (state.svcGroup !== "ideas" && !state.mech) loadMech().then(function () { renderService(page); }); else renderService(page);
+      };
+    });
+  }
+
   function renderService(page) {
+    var grp = state.svcGroup || "ideas";
+    if (grp !== "ideas") {
+      if (!state.mech) { page.innerHTML = '<div class="note">Loading…</div>'; loadMech().then(function () { renderService(page); }); return; }
+      var F = mechFeed(grp);
+      page.innerHTML =
+        '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
+        '<section class="pinned' + (F.run ? " live" : "") + '"><div style="display:flex;align-items:center;gap:12px"><span class="eyebrow">PINNED</span><span style="font-size:14px;font-weight:600">' + (F.run || "No current running trades") + '</span></div><span class="muted" style="font-size:12px">' + (F.run ? "Running now" : "A running trade pins here first") + "</span></section>" +
+        '<section class="card"><div class="feed-head"><div class="who"><div class="pic"><img src="' + LOGO + '" alt=""></div><div><div style="font-size:15px;font-weight:700" class="metal-text">' + esc(F.name) + '</div><div class="muted" style="font-size:11px">Mech Model · live from the scanner</div></div></div></div>' +
+        '<div class="feed"><div class="feed-inner">' + (F.items || '<div class="note" style="text-align:center;padding:40px">No trades yet.' + (grp === "GBPUSD" ? " GBPUSD isn't traded on the Mech Model right now." : "") + "</div>") + "</div></div></section>";
+      bindSvc(page);
+      var fi = page.querySelector(".feed"); if (fi) fi.scrollTop = fi.scrollHeight;
+      return;
+    }
     var run = runningTrade();
     var TAG = { live: "LIVE SESSION", signal: "NEW SIGNAL", win: "TAKE PROFIT", loss: "STOP LOSS", be: "BREAKEVEN", update: "TRADE UPDATE" };
     var byId = {}; state.messages.forEach(function (m) { byId[m.message_id] = m; });
@@ -386,10 +469,11 @@
         '<span class="time">' + time + (m.edited_at ? " · edited" : "") + "</span></div>";
     });
     page.innerHTML =
-      '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
       '<section class="pinned' + (run ? " live" : "") + '"><div style="display:flex;align-items:center;gap:12px"><span class="eyebrow">PINNED</span><span style="font-size:14px;font-weight:600">' + (run ? esc(plainFirstLine(run)) : "No current running trades") + '</span></div><span class="muted" style="font-size:12px">' + (run ? "Running now" : "A running trade pins here first") + "</span></section>" +
       '<section class="card"><div class="feed-head"><div class="who"><div class="pic"><img src="' + LOGO + '" alt=""></div><div><div style="font-size:15px;font-weight:700" class="metal-text">SDX Trade Ideas</div><div class="muted" style="font-size:11px">Live from Telegram</div></div></div><a href="#/tracker" class="muted" style="font-size:12px">Results</a></div>' +
       '<div class="feed"><div class="feed-inner">' + (items || '<div class="note" style="text-align:center;padding:40px">No messages yet.</div>') + "</div></div></section>";
+    bindSvc(page);
   }
 
   function renderTracker(page) {
