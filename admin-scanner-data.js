@@ -11,7 +11,7 @@
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { ovSec: {}, ovPg: {}, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
+  var S = { ovSec: {}, ovPg: {}, ovTab: {}, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -255,6 +255,10 @@
     if (b.type === "head") return '<span class="eyebrow" style="margin-top:8px">' + esc(b.text.toUpperCase()) + "</span>";
     if (b.type === "note") return '<div class="note" style="font-size:12px">' + esc(b.text) + "</div>";
     if (b.type === "list") return '<ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5">' + b.items.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+    if (b.type === "tabs") {
+      var key = S.scan + (S.ovPg[S.scan] || ""), cur = S.ovTab[key] != null ? S.ovTab[key] : b.tabs.length - 1, t = b.tabs[cur] || b.tabs[0];
+      return '<div class="chips">' + b.tabs.map(function (x, i) { return '<button class="chip' + (i === cur ? " on" : "") + '" data-ovtab="' + i + '">' + esc(x.name) + "</button>"; }).join("") + "</div>" + t.blocks.map(pgBlock).join("");
+    }
     if (b.type === "tiles") return '<div class="tiles">' + b.items.map(function (x) { return tile(x[0], x[1], x[2]); }).join("") + "</div>";
     if (b.type === "table") return '<div class="scroll-x"><table style="min-width:' + Math.max(520, b.cols.length * 95) + 'px"><thead><tr>' + b.cols.map(function (c, i) { return "<th" + (c[1] === "txt" ? "" : ' class="r"') + ">" + esc(c[0]) + "</th>"; }).join("") + "</tr></thead><tbody>" +
       b.rows.map(function (r) { return "<tr>" + r.map(function (v, i) { return pgCell(v, b.cols[i][1]); }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
@@ -390,12 +394,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=25", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=26", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=25", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=26", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
@@ -411,6 +415,7 @@
   }
   function wire(page, redraw) {
     $$("[data-sdscan]", page).forEach(function (b) { b.onclick = function () { S.scan = b.dataset.sdscan || null; S.month = null; S.sec = "overview"; redraw(); window.scrollTo(0, 0); }; });
+    $$("[data-ovtab]", page).forEach(function (b) { b.onclick = function () { S.ovTab[S.scan + (S.ovPg[S.scan] || "")] = +b.dataset.ovtab; redraw(); }; });
     $$("[data-ovp]", page).forEach(function (b) { b.onclick = function () { S.ovPg[S.scan] = b.dataset.ovp; redraw(); }; });
     $$("[data-ovs]", page).forEach(function (b) { b.onclick = function () { S.ovSec[S.scan] = b.dataset.ovs; redraw(); }; });
     $$("[data-ovver]", page).forEach(function (b) { b.onclick = function () { S.ver[S.scan + S.mkt] = b.dataset.ovver; S.sec = "trades"; S.year = "all"; S.month = null; redraw(); window.scrollTo(0, 0); }; });
