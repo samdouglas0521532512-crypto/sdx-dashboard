@@ -428,7 +428,59 @@
     var g = state.svcGroup || "ideas";
     return '<div style="display:flex;flex-direction:column;gap:10px"><div class="tabs" style="flex-wrap:wrap"><button class="tab' + (g === "ideas" ? " on" : "") + '" data-svc="ideas">SDX Trade Ideas</button></div>' +
       '<div class="eyebrow">MECH MODEL</div><div class="tabs" style="flex-wrap:wrap">' +
-      MECH.map(function (m) { return '<button class="tab' + (g === m[0] ? " on" : "") + '" data-svc="' + m[0] + '">' + m[1] + "</button>"; }).join("") + "</div></div>";
+      MECH.map(function (m) { return '<button class="tab' + (g === m[0] ? " on" : "") + '" data-svc="' + m[0] + '">' + m[1] + "</button>"; }).join("") +
+      '<button class="tab' + (g === "tracker" ? " on" : "") + '" data-svc="tracker">Tracker</button>' + "</div></div>";
+  }
+  // ---------- Mech Model tracker: live results from the scanner + backtest month totals ----------
+  var TR_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function trR(x) { x = Math.round(x * 10) / 10; return (x > 0 ? "+" : "") + x + "R"; }
+  function trCol(x) { return x > 0 ? "#16C35A" : x < 0 ? "#FF4D4D" : "#8C929C"; }
+  function trTile(k, v, c) { return '<div style="background:#0b0b0c;border-radius:10px;padding:10px 14px;box-shadow:inset 0 0 0 1px #1f2023;min-width:120px;flex:1"><div class="muted" style="font-size:11px">' + k + '</div><div style="font:600 18px var(--sg)' + (c ? ";color:" + c : "") + '">' + v + "</div></div>"; }
+  function trBoxes(ms) {
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">' + ms.map(function (m, i) {
+      if (!m) return '<div style="border:1px dashed #2a2b2f;border-radius:12px;padding:12px;min-height:88px;opacity:.55"><div style="font:700 13px var(--sg)">' + TR_MON[i] + '</div><div class="muted" style="font-size:11px;margin-top:6px">No trades</div></div>';
+      var c = trCol(m.R), bg = m.R > 0 ? "rgba(22,195,90,.12)" : m.R < 0 ? "rgba(255,77,77,.12)" : "rgba(140,146,156,.14)";
+      return '<div style="background:' + bg + ';border:1px solid ' + c + ';border-radius:12px;padding:12px;min-height:88px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 13px var(--sg)">' + TR_MON[i] + '</span><span class="muted" style="font-size:11px">' + m.n + ' trades</span></div><div style="font:700 20px var(--sg);color:' + c + '">' + trR(m.R) + '</div><div class="muted" style="font-size:11px">W ' + m.w + " · BE " + m.b + " · L " + m.l + "</div></div>";
+    }).join("") + "</div>";
+  }
+  function trSum(ms) {
+    var t = 0, n = 0, w = 0, b = 0, l = 0, up = 0, had = 0;
+    ms.forEach(function (m) { if (!m) return; had++; t += m.R; n += m.n; w += m.w; b += m.b; l += m.l; if (m.R > 0) up++; });
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px">' + trTile("Total R", trR(t), trCol(t)) + trTile("Trades", n) + trTile("Wins / BE / Losses", w + " / " + b + " / " + l) +
+      trTile("Win rate (W vs L)", w + l ? Math.round(1000 * w / (w + l)) / 10 + "%" : "—") + trTile("Profitable months", up + " of " + had) + "</div>";
+  }
+  function trChips(list, cur, attr) { return '<div class="tabs" style="flex-wrap:wrap;align-self:flex-start">' + list.map(function (x) { return '<button class="tab' + (x[0] === cur ? " on" : "") + '" ' + attr + '="' + x[0] + '">' + x[1] + "</button>"; }).join("") + "</div>"; }
+  function liveCal(pair) {
+    var cal = {};
+    (state.mech || []).forEach(function (g) {
+      if (["tp", "sl", "be"].indexOf(g.status) < 0) return;
+      var p = mechPair(g.symbol); if (!p || (pair !== "all" && p !== pair)) return;
+      var r = g.status === "tp" ? Math.abs(g.tp - g.entry) / Math.abs(g.entry - g.sl) : g.status === "sl" ? -1 : 0;
+      var d = new Date(g.updated_at || g.created_at), y = d.toLocaleString("en-GB", { year: "numeric", timeZone: "Europe/London" }), mo = +d.toLocaleString("en-GB", { month: "numeric", timeZone: "Europe/London" }) - 1;
+      cal[y] = cal[y] || [null, null, null, null, null, null, null, null, null, null, null, null];
+      var m = cal[y][mo] = cal[y][mo] || { R: 0, n: 0, w: 0, b: 0, l: 0 };
+      m.R += r; m.n++; if (r > 0) m.w++; else if (r < 0) m.l++; else m.b++;
+    });
+    return cal;
+  }
+  function renderTrackerTab(page) {
+    var TP = [["all", "All pairs"], ["XAUUSD", "XAUUSD"], ["EURUSD", "EURUSD"], ["GER30", "GER30"]];
+    var lp = state.trLive || "all", bp = state.trBt || "all";
+    var L = liveCal(lp), ly = Object.keys(L).sort(), lyr = state.trLiveY && L[state.trLiveY] ? state.trLiveY : ly[ly.length - 1];
+    var open = (state.mech || []).filter(function (g) { var p = mechPair(g.symbol); return (g.status === "triggered" || g.status === "waiting") && (lp === "all" || p === lp); }).length;
+    var live = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">LIVE RESULTS · MECH MODEL</div>' + trChips(TP.concat([["GBPUSD", "GBPUSD"]]), lp, "data-trl") +
+      (ly.length > 1 ? trChips(ly.map(function (y) { return [y, y]; }), lyr, "data-trly") : "") +
+      (lyr ? trSum(L[lyr]) + trBoxes(L[lyr]) : '<div class="note">No closed trades yet. Results show here as each trade finishes.</div>') +
+      '<div class="muted" style="font-size:12px">Every closed Mech Model trade sent by the scanner, in R. ' + (open ? open + " trade" + (open === 1 ? "" : "s") + " still running, not counted yet. " : "") + "Win rate counts wins against losses only.</div></section>";
+    var B = (window.SDX_TRACK && window.SDX_TRACK.cal[bp]) || {}, by = Object.keys(B).sort(), byr = state.trBtY && B[state.trBtY] ? state.trBtY : by[by.length - 1];
+    var bt = by.length ? '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">BACKTESTED RESULTS · MECH MODEL</div>' + trChips(TP, bp, "data-trb") +
+      trChips(by.map(function (y) { return [y, y + (y === "2026" ? " so far" : "")]; }), byr, "data-trby") + trSum(B[byr]) + trBoxes(B[byr]) +
+      '<div class="muted" style="font-size:12px">Backtested, not live trades. No spread. All pairs = XAUUSD + EURUSD + GER30 with the same risk on every trade. Data: XAUUSD 2022-2026, EURUSD 2023-2025, GER30 2022 - May 2026.</div></section>' : "";
+    page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() + live + bt;
+    bindSvc(page);
+    [["data-trl", "trLive"], ["data-trly", "trLiveY"], ["data-trb", "trBt"], ["data-trby", "trBtY"]].forEach(function (a) {
+      page.querySelectorAll("[" + a[0] + "]").forEach(function (b) { b.onclick = function () { state[a[1]] = b.getAttribute(a[0]); if (a[0] === "data-trb") state.trBtY = null; if (a[0] === "data-trl") state.trLiveY = null; renderTrackerTab(page); }; });
+    });
   }
   function bindSvc(page) {
     page.querySelectorAll("[data-svc]").forEach(function (b) {
@@ -443,6 +495,7 @@
     var grp = state.svcGroup || "ideas";
     if (grp !== "ideas") {
       if (!state.mech) { page.innerHTML = '<div class="note">Loading…</div>'; loadMech().then(function () { renderService(page); }); return; }
+      if (grp === "tracker") { renderTrackerTab(page); return; }
       var F = mechFeed(grp);
       page.innerHTML =
         '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
