@@ -483,21 +483,26 @@
   }
   function renderTrackerTab(page) {
     var TP = [["all", "All pairs"], ["XAUUSD", "XAUUSD"], ["EURUSD", "EURUSD"], ["GER30", "GER30"]];
-    var lp = state.trLive || "all", bp = state.trBt || "all";
-    var L = liveCal(lp), ly = Object.keys(L).sort(), lyr = state.trLiveY && L[state.trLiveY] ? state.trLiveY : ly[ly.length - 1];
-    var open = (state.mech || []).filter(function (g) { var p = mechPair(g.symbol); return (g.status === "triggered" || g.status === "waiting") && (lp === "all" || p === lp); }).length;
-    var live = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">LIVE RESULTS · MECH MODEL</div>' + trChips(TP.concat([["GBPUSD", "GBPUSD"]]), lp, "data-trl") +
-      (ly.length > 1 ? trChips(ly.map(function (y) { return [y, y]; }), lyr, "data-trly") : "") +
-      (lyr ? trSum(L[lyr]) + trBoxes(L[lyr]) : '<div class="note">No closed trades yet. Results show here as each trade finishes.</div>') +
-      '<div class="muted" style="font-size:12px">Every closed Mech Model trade sent by the scanner, in R. ' + (open ? open + " trade" + (open === 1 ? "" : "s") + " still running, not counted yet. " : "") + "Win rate counts wins against losses only.</div></section>";
-    var B = (window.SDX_TRACK && window.SDX_TRACK.cal[bp]) || {}, by = Object.keys(B).sort(), byr = state.trBtY && B[state.trBtY] ? state.trBtY : by[by.length - 1];
-    var bt = by.length ? '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">BACKTESTED RESULTS · MECH MODEL</div>' + trChips(TP, bp, "data-trb") +
-      trChips(by.map(function (y) { return [y, y + (y === "2026" ? " so far" : "")]; }), byr, "data-trby") + trSum(B[byr]) + trBoxes(B[byr]) +
-      '<div class="muted" style="font-size:12px">Backtested, not live trades. No spread. All pairs = XAUUSD + EURUSD + GER30 with the same risk on every trade. Data: XAUUSD 2022-2026, EURUSD 2023-2025, GER30 2022 - May 2026.</div></section>' : "";
-    page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() + live + bt;
+    var pair = state.trBt || "all";
+    // backtest months, then live closed trades added on top (they start after the backtest data ends)
+    var B = JSON.parse(JSON.stringify((window.SDX_TRACK && window.SDX_TRACK.cal[pair]) || {})), L = liveCal(pair);
+    Object.keys(L).forEach(function (y) {
+      B[y] = B[y] || [null, null, null, null, null, null, null, null, null, null, null, null];
+      L[y].forEach(function (m, i) { if (!m) return; var o = B[y][i] = B[y][i] || { R: 0, n: 0 }; o.R += m.R; o.n += m.n; });
+    });
+    var years = Object.keys(B).sort(), yr = state.trBtY && B[state.trBtY] ? state.trBtY : years[years.length - 1];
+    var boxes = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">' + (B[yr] || []).map(function (m, i) {
+      if (!m || !m.n) return '<div style="border:1px dashed #2a2b2f;border-radius:12px;padding:14px;min-height:84px;opacity:.5"><div style="font:700 13px var(--sg)">' + TR_MON[i] + "</div></div>";
+      var R = Math.round(m.R * 10) / 10, c = trCol(R), bg = R > 0 ? "rgba(22,195,90,.12)" : R < 0 ? "rgba(255,77,77,.12)" : "rgba(140,146,156,.14)";
+      return '<div style="background:' + bg + ';border:1px solid ' + c + ';border-radius:12px;padding:14px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between"><div style="font:700 13px var(--sg)">' + TR_MON[i] + '</div><div style="font:700 22px var(--sg);color:' + c + '">' + trR(R) + "</div></div>";
+    }).join("") + "</div>";
+    page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
+      '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">TRACKER · MECH MODEL</div>' + trChips(TP, pair, "data-trb") +
+      (years.length ? trChips(years.map(function (y) { return [y, y]; }), yr, "data-trby") + boxes : '<div class="note">No results yet.</div>') +
+      '<div class="muted" style="font-size:12px">Results in R. Green = profitable month, red = losing month, grey = breakeven. Months before the scanner went live are backtested.</div></section>';
     bindSvc(page);
-    [["data-trl", "trLive"], ["data-trly", "trLiveY"], ["data-trb", "trBt"], ["data-trby", "trBtY"]].forEach(function (a) {
-      page.querySelectorAll("[" + a[0] + "]").forEach(function (b) { b.onclick = function () { state[a[1]] = b.getAttribute(a[0]); if (a[0] === "data-trb") state.trBtY = null; if (a[0] === "data-trl") state.trLiveY = null; renderTrackerTab(page); }; });
+    [["data-trb", "trBt"], ["data-trby", "trBtY"]].forEach(function (a) {
+      page.querySelectorAll("[" + a[0] + "]").forEach(function (b) { b.onclick = function () { state[a[1]] = b.getAttribute(a[0]); renderTrackerTab(page); }; });
     });
   }
   function bindSvc(page) {
