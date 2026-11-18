@@ -11,7 +11,7 @@
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { ovSec: {}, ovPg: {}, ovTab: {}, calPair: "all", calYear: null, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
+  var S = { ovSec: {}, ovPg: {}, ovTab: {}, calPair: "all", calYear: null, calAll: false, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -305,7 +305,28 @@
         '<div class="note" style="font-size:11px">W ' + m.w + " · BE " + m.b + " · L " + m.l + "</div></div>";
     }).join("") + "</div>";
     var note = '<div class="note" style="font-size:12px">Green = profitable month, red = losing month, grey = breakeven. All traded pairs = XAUUSD + EURUSD + GER30, same risk on every trade (GBPUSD isn\'t traded, so it\'s left out). Data: XAUUSD Jan 2022 - Nov 2026 (no June 2026), EURUSD 2023-2025, GER30 Jan 2022 - May 2026. No spread. Tap a pair to see all its data below.</div>';
-    return card('<span class="eyebrow">FAILED BREAK MODEL · RESULTS ' + esc(yr) + (yr === "2026" ? " SO FAR" : "") + " · " + esc(CAL_PAIRS.filter(function (x) { return x[0] === pair; })[0][1].toUpperCase()) + "</span>" + pairBtns + yearBtns + tiles + boxes + note);
+    var allBtn = '<div class="chips"><button class="chip' + (S.calAll ? " on" : "") + '" data-calall="1">Refined model results 2022-2026</button>' + (S.calAll ? '<button class="chip" data-calall="0">Back to ' + esc(yr) + "</button>" : "") + "</div>";
+    if (S.calAll) {
+      var cell = function (m) {
+        if (!m) return '<td class="r" style="opacity:.45">—</td>';
+        var bg = m.R > 0 ? "rgba(22,195,90,.16)" : m.R < 0 ? "rgba(255,77,77,.16)" : "rgba(140,146,156,.18)";
+        var fg = m.R > 0 ? "#16C35A" : m.R < 0 ? "#FF4D4D" : "#8C929C";
+        return '<td class="r" style="background:' + bg + ';white-space:nowrap"><div style="font-weight:700;color:' + fg + '">' + rTxt(m.R) + '</div><div class="note" style="font-size:10.5px">' + m.n + " tr</div></td>";
+      };
+      var grand = 0, gn = 0, gw = 0, gl = 0;
+      var body = years.map(function (y) {
+        var t = 0, tn = 0, tw = 0, tl = 0;
+        P[y].forEach(function (m) { if (m) { t += m.R; tn += m.n; tw += m.w; tl += m.l; } });
+        t = Math.round(t * 10) / 10; grand += t; gn += tn; gw += tw; gl += tl;
+        return "<tr><td><b>" + y + (y === "2026" ? " (so far)" : "") + "</b></td>" + P[y].map(cell).join("") + '<td class="r ' + cls(t) + '" style="font-weight:700">' + rTxt(t) + '</td><td class="r">' + tn + '</td><td class="r">' + (tw + tl ? Math.round(1000 * tw / (tw + tl)) / 10 + "%" : "—") + "</td></tr>";
+      }).join("");
+      grand = Math.round(grand * 10) / 10;
+      var table = '<div class="scroll-x"><table style="min-width:1100px"><thead><tr><th>Year</th>' + MON.map(function (m) { return '<th class="r">' + m + "</th>"; }).join("") + '<th class="r">Year R</th><th class="r">Trades</th><th class="r">Win rate (W vs L)</th></tr></thead><tbody>' + body +
+        '<tr><td><b>Total</b></td>' + MON.map(function () { return "<td></td>"; }).join("") + '<td class="r ' + cls(grand) + '" style="font-weight:700">' + rTxt(grand) + '</td><td class="r">' + gn + '</td><td class="r">' + (gw + gl ? Math.round(1000 * gw / (gw + gl)) / 10 + "%" : "—") + "</td></tr></tbody></table></div>";
+      return card('<span class="eyebrow">FAILED BREAK MODEL · REFINED MODEL RESULTS 2022-2026 · ' + esc(CAL_PAIRS.filter(function (x) { return x[0] === pair; })[0][1].toUpperCase()) + "</span>" + pairBtns + allBtn +
+        '<div class="tiles">' + tile("Total R", rTxt(grand), cls(grand)) + tile("Trades", gn) + tile("Win rate (W vs L)", gw + gl ? Math.round(1000 * gw / (gw + gl)) / 10 + "%" : "—") + "</div>" + table + note);
+    }
+    return card('<span class="eyebrow">FAILED BREAK MODEL · RESULTS ' + esc(yr) + (yr === "2026" ? " SO FAR" : "") + " · " + esc(CAL_PAIRS.filter(function (x) { return x[0] === pair; })[0][1].toUpperCase()) + "</span>" + pairBtns + allBtn + yearBtns + tiles + boxes + note);
   }
   function overview() {
     var d = D(S.scan), O = d.overview, b = O.best;
@@ -459,6 +480,7 @@
   function wire(page, redraw) {
     $$("[data-sdscan]", page).forEach(function (b) { b.onclick = function () { S.scan = b.dataset.sdscan || null; S.month = null; S.sec = "overview"; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-ovtab]", page).forEach(function (b) { b.onclick = function () { S.ovTab[S.scan + (S.ovPg[S.scan] || "")] = +b.dataset.ovtab; redraw(); }; });
+    $$("[data-calall]", page).forEach(function (b) { b.onclick = function () { S.calAll = b.dataset.calall === "1"; redraw(); }; });
     $$("[data-calp]", page).forEach(function (b) { b.onclick = function () { S.calPair = b.dataset.calp; if (S.calPair !== "all") { S.mkt = S.calPair; S.month = null; } redraw(); }; });
     $$("[data-caly]", page).forEach(function (b) { b.onclick = function () { S.calYear = b.dataset.caly; redraw(); }; });
     $$("[data-ovp]", page).forEach(function (b) { b.onclick = function () { S.ovPg[S.scan] = b.dataset.ovp; redraw(); }; });
