@@ -83,7 +83,7 @@
     ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["scanners", "Scanners", "scanners"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
     ["PARTNERS", [["brokers", "Brokers", "brokers"], ["edu", "Educational Platform", "edu", 0, C.ELITE_PACK_URL]]],
     ["HELP", [["support", "Support", "support"]]],
-    ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["notion", "My Notion", "notion"]]]
+    ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["manualbt", "Manual backtest", "scandata"], ["notion", "My Notion", "notion"]]]
   ];
 
   var ELITE_ONLY = ["journal"];
@@ -238,7 +238,7 @@
     var cur = route();
     var free = isFree();
     var admin = (state.member.plan || "") === "Admin";
-    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scandata" || cur === "notion") && !admin)) { location.hash = "#/dashboard"; return; }
+    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scandata" || cur === "manualbt" || cur === "notion") && !admin)) { location.hash = "#/dashboard"; return; }
     var nav = NAV.filter(function (g) { return g[0] !== "ADMIN" || admin; }).map(function (g) {
       return '<div class="group"><div class="label">' + g[0] + "</div>" + g[1].filter(function (n) { return !(free && ELITE_ONLY.indexOf(n[0]) > -1); }).map(function (n) {
         var ext = n[4];
@@ -248,7 +248,7 @@
     }).join("");
     var nm = state.member.name || state.session.user.email.split("@")[0];
     var initials = nm.split(/\s+/).map(function (w) { return w[0]; }).join("").slice(0, 2).toUpperCase();
-    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", support: "Support", admin: "Admin", scandata: "Entry model data", socials: "Socials", brokers: "Brokers" };
+    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", support: "Support", admin: "Admin", scandata: "Entry model data", manualbt: "Manual backtest", socials: "Socials", brokers: "Brokers" };
     app.innerHTML =
       '<div class="mbar"><button class="mbtn" id="menuBtn" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>' + brand() + '<span class="live-dot">LIVE</span></div>' +
       '<div class="shell"><div class="scrim" id="scrim"></div><nav class="side" id="side" aria-label="Main menu">' + brand() + nav +
