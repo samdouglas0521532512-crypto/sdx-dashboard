@@ -88,8 +88,25 @@
   function verPicker(key) {
     var V = versions(key); if (V.length < 2) return "";
     var cur = curVer(key).id;
-    return '<label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="note" style="font-size:12px">Version</span><select class="input" data-sdv="' + key + '" style="height:38px;width:auto;font-size:13px">' +
-      V.map(function (v) { return '<option value="' + esc(v.id) + '"' + (v.id === cur ? " selected" : "") + ">" + esc(v.name) + "</option>"; }).join("") + "</select></label>";
+    var staged = V.some(function (v) { return v.stage; });
+    function opt(v) { return '<option value="' + esc(v.id) + '"' + (v.id === cur ? " selected" : "") + ">" + esc(v.name) + "</option>"; }
+    var inner;
+    if (staged) {
+      var g = function (label, st) { var L = V.filter(function (v) { return st.indexOf(v.stage) >= 0; }); return L.length ? '<optgroup label="' + esc(label) + '">' + L.map(opt).join("") + "</optgroup>" : ""; };
+      inner = g(V.some(function (x) { return x.noTrade; }) ? "LATEST · most refined (not traded)" : "LATEST · most refined (use this)", ["latest", "latest-part"]) + g("BEFORE REFINEMENT · valid at the time", ["older"]);
+    } else inner = V.map(opt).join("");
+    return '<label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="note" style="font-size:12px">Version</span><select class="input" data-sdv="' + key + '" style="height:38px;width:auto;font-size:13px">' + inner + "</select></label>";
+  }
+  function verBanner(key) {
+    var v = curVer(key); if (!v || !v.stage) return "";
+    var latest = v.stage !== "older";
+    var top = versions(key).filter(function (x) { return x.stage === "latest"; })[0];
+    if (v.noTrade) return '<div style="border:1px solid var(--neg, #FF4D4D);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45"><b style="color:var(--neg, #FF4D4D)">NOT TRADED ON THIS PAIR.</b> This is the most refined test, but nothing held up in the latest year, so the model isn\'t used here.</div>';
+    var msg = latest
+      ? (v.stage === "latest" ? "LATEST · MOST REFINED. This is the version to use. All the refinements so far are built in." : "LATEST · MOST REFINED (one part of it). Part of " + (top ? top.name : "the latest version") + ".")
+      : "BEFORE REFINEMENT. These rules were valid at the time and the results are real backtests, but they've since been refined. For trading, use " + (top ? top.name : "the latest version") + ".";
+    var col = latest ? "var(--pos, #16C35A)" : "var(--warn, #E0A100)";
+    return '<div style="border:1px solid ' + col + ';border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45"><b style="color:' + col + '">' + esc(msg.split(".")[0]) + ".</b>" + esc(msg.slice(msg.indexOf(".") + 1)) + "</div>";
   }
 
   // ---------- comparison of every version of a scanner ----------
@@ -201,7 +218,7 @@
   }
   function verHead(title) {
     var v = curVer(S.scan), d = D(S.scan);
-    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="eyebrow">' + esc(title) + "</span>" + verPicker(S.scan) + "</div>" +
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span class="eyebrow">' + esc(title) + "</span>" + verPicker(S.scan) + "</div>" + verBanner(S.scan) +
       '<div class="note" style="font-size:12px">' + esc(S.mkt + " · " + d.from + " to " + d.to + " · " + v.settings) + "</div>" + tpPicker(v);
   }
   function tpPicker(v) {
@@ -394,12 +411,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=31", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=32", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=31", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=32", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
