@@ -392,37 +392,55 @@
       } catch (e) { }
     }
   }
+  function loadBt(pair) {
+    window.SDX_MECHBT = window.SDX_MECHBT || {};
+    if (pair === "GBPUSD" || window.SDX_MECHBT[pair]) return Promise.resolve();
+    return new Promise(function (ok) { var sc = document.createElement("script"); sc.src = "mech-bt-" + pair + ".js?v=1"; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
+  }
   function mechFeed(pair) {
     var cfg = MECH.filter(function (m) { return m[0] === pair; })[0], pip = cfg[2], dec = cfg[3];
     var num = function (x) { return Number(x).toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec }); };
     var pips = function (x) { return (Math.round(Math.abs(x) / pip * 100) / 100).toLocaleString("en-GB"); };
-    var rows = (state.mech || []).filter(function (g) { return mechPair(g.symbol) === pair; });
-    var ev = [], run = null;
-    rows.forEach(function (g) {
-      var e = +g.entry, sl = +g.sl, tp = +g.tp, rf = +g.rf, side = String(g.side || "").toUpperCase();
-      var head = esc(g.symbol) + " " + side + " NOW";
-      ev.push({ t: g.created_at, kind: "signal", tag: "NEW SIGNAL", tf: g.tf, text: head + "<br><br>@" + num(e) + "<br><br>SL " + num(sl) + " ( " + pips(e - sl) + " pips )<br><br>TP " + num(tp) + " ( " + pips(tp - e) + " pips )<br><br>Risk =1.5%" });
-      if (rf > 0) ev.push({ t: g.created_at, kind: "update", tag: "TRADE UPDATE", reply: head, text: "Risk free point @" + num(rf) });
-      var done = g.status === "tp" || g.status === "sl" || g.status === "be" || g.status === "cancelled";
-      if (g.rf_hit) ev.push({ t: done ? new Date(new Date(g.updated_at).getTime() - 1).toISOString() : g.updated_at, noTime: done, kind: "update", tag: "TRADE UPDATE", reply: head, text: "Risk free point hit ✅<br><br>Go risk free" });
-      if (g.status === "tp") ev.push({ t: g.updated_at, kind: "win", tag: "TAKE PROFIT", reply: head, text: "Take Profit Hit ✅<br><br>+" + (Math.round(Math.abs(tp - e) / Math.abs(e - sl) * 10) / 10) + "R Secured on this position" });
-      else if (g.status === "sl") ev.push({ t: g.updated_at, kind: "loss", tag: "STOP LOSS", reply: head, text: "Stop loss hit<br><br>-1R on this position" });
-      else if (g.status === "be") ev.push({ t: g.updated_at, kind: "be", tag: "BREAKEVEN", reply: head, text: "Breakeven<br><br>Closed at entry, no loss" });
-      else if (g.status === "cancelled") ev.push({ t: g.updated_at, kind: "update", tag: "CANCELLED", reply: head, text: "Trade cancelled" });
-      if (g.status === "triggered" || g.status === "waiting") run = head + " @" + num(e);
+    var trades = [], run = null;
+    function build(o) {
+      var e = o.e, sl = o.sl, tp = o.tp, rf = o.rf, bt = o.bt, head = esc(o.sym) + " " + o.side + " NOW", ev = [];
+      var x = function (t, kind, tag, text, reply, noTime) { ev.push({ t: t, kind: kind, tag: tag, text: text, reply: reply ? head : "", noTime: noTime, tf: kind === "signal" ? o.tf : "", bt: bt }); };
+      x(o.t0, "signal", "NEW SIGNAL", head + "<br><br>@" + num(e) + "<br><br>SL " + num(sl) + " ( " + pips(e - sl) + " pips )<br><br>TP " + num(tp) + " ( " + pips(tp - e) + " pips )<br><br>Risk =1.5%");
+      if (rf > 0) x(o.t0, "update", "TRADE UPDATE", "Risk free point @" + num(rf), 1);
+      if (o.rfT) x(o.rfT, "update", "TRADE UPDATE", "Risk free point hit ✅<br><br>Go risk free", 1, o.rfNoTime);
+      if (o.res === "tp") x(o.tEnd, "win", "TAKE PROFIT", "Take Profit Hit ✅<br><br>+" + (Math.round(Math.abs(tp - e) / Math.abs(e - sl) * 10) / 10) + "R Secured on this position", 1);
+      else if (o.res === "sl") x(o.tEnd, "loss", "STOP LOSS", "Stop loss hit<br><br>-1R on this position", 1);
+      else if (o.res === "be") x(o.tEnd, "be", "BREAKEVEN", "Breakeven<br><br>Closed at entry, no loss", 1);
+      else if (o.res === "cancelled") x(o.tEnd, "update", "CANCELLED", "Trade cancelled", 1);
+      trades.push({ t: o.t0, ev: ev });
+    }
+    var iso = function (m) { return new Date(m * 60000).toISOString(); };
+    ((window.SDX_MECHBT || {})[pair] || []).forEach(function (r) {
+      build({ bt: 1, sym: pair, side: r[2] === 1 ? "BUY" : "SELL", tf: r[1], e: r[3], sl: r[4], tp: r[5], rf: r[6], t0: iso(r[0]), rfT: r[7] ? iso(r[7]) : null, tEnd: iso(r[8]), res: r[9] });
     });
+    (state.mech || []).filter(function (g) { return mechPair(g.symbol) === pair; }).forEach(function (g) {
+      var done = ["tp", "sl", "be", "cancelled"].indexOf(g.status) > -1;
+      build({ bt: 0, sym: g.symbol, side: String(g.side || "").toUpperCase(), tf: g.tf, e: +g.entry, sl: +g.sl, tp: +g.tp, rf: +g.rf, t0: g.created_at,
+        rfT: g.rf_hit ? (done ? new Date(new Date(g.updated_at).getTime() - 1).toISOString() : g.updated_at) : null, rfNoTime: done, tEnd: g.updated_at, res: done ? g.status : "" });
+      if (!done) run = esc(g.symbol) + " " + String(g.side || "").toUpperCase() + " NOW @" + num(+g.entry);
+    });
+    trades.sort(function (a, b) { return a.t < b.t ? -1 : 1; });
+    state.mechShow = state.mechShow || {};
+    var show = state.mechShow[pair] || 50, total = trades.length, more = Math.max(0, total - show);
+    var ev = [];
+    trades.slice(more).forEach(function (t) { ev = ev.concat(t.ev); });
     ev.forEach(function (m, k) { m.k = k; });
     ev.sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : a.k - b.k; });
-    var lastDay = "", items = "";
+    var lastDay = "", items = more ? '<div style="text-align:center;padding:8px"><button class="tab" data-more="' + pair + '" style="box-shadow:inset 0 0 0 1px #2a2b2f">Show earlier trades (' + more + " more)</button></div>" : "";
     ev.forEach(function (m) {
       var dt = new Date(m.t);
       var day = dt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" }).toUpperCase();
       if (day !== lastDay) { items += '<div class="day">' + esc(day) + "</div>"; lastDay = day; }
       var time = !m.noTime ? dt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }) : "";
-      items += '<div class="bubble k-' + m.kind + '"><div class="head"><span class="from metal-text">' + esc(cfg[1]) + (m.tf ? " · " + esc(String(m.tf)) : "") + '</span><span class="tag">' + m.tag + "</span></div>" +
+      items += '<div class="bubble k-' + m.kind + '"' + (m.bt ? ' style="opacity:.92"' : "") + '><div class="head"><span class="from metal-text">' + esc(cfg[1]) + (m.tf ? " · " + esc(String(m.tf)) : "") + '</span><span style="display:flex;gap:6px">' + (m.bt ? '<span class="tag" style="background:#1c1c1e;color:#c9ced6">BACKTEST</span>' : "") + '<span class="tag">' + m.tag + "</span></span></div>" +
         (m.reply ? '<div class="reply"><b>Reply</b>' + m.reply + "</div>" : "") + '<div class="body">' + m.text + "</div>" + (time ? '<span class="time">' + time + "</span>" : "") + "</div>";
     });
-    return { items: items, run: run, name: cfg[1] };
+    return { items: items, run: run, name: cfg[1], hasBt: !!((window.SDX_MECHBT || {})[pair] || []).length };
   }
   function svcTabs() {
     var g = state.svcGroup || "ideas";
@@ -495,15 +513,17 @@
     var grp = state.svcGroup || "ideas";
     if (grp !== "ideas") {
       if (!state.mech) { page.innerHTML = '<div class="note">Loading…</div>'; loadMech().then(function () { renderService(page); }); return; }
+      if (grp !== "tracker" && grp !== "GBPUSD" && !(window.SDX_MECHBT && window.SDX_MECHBT[grp])) { page.innerHTML = '<div class="note">Loading…</div>'; loadBt(grp).then(function () { renderService(page); }); return; }
       if (grp === "tracker") { renderTrackerTab(page); return; }
       var F = mechFeed(grp);
       page.innerHTML =
         '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
         '<section class="pinned' + (F.run ? " live" : "") + '"><div style="display:flex;align-items:center;gap:12px"><span class="eyebrow">PINNED</span><span style="font-size:14px;font-weight:600">' + (F.run || "No current running trades") + '</span></div><span class="muted" style="font-size:12px">' + (F.run ? "Running now" : "A running trade pins here first") + "</span></section>" +
-        '<section class="card"><div class="feed-head"><div class="who"><div class="pic"><img src="' + LOGO + '" alt=""></div><div><div style="font-size:15px;font-weight:700" class="metal-text">' + esc(F.name) + '</div><div class="muted" style="font-size:11px">Mech Model · live from the scanner</div></div></div></div>' +
+        '<section class="card"><div class="feed-head"><div class="who"><div class="pic"><img src="' + LOGO + '" alt=""></div><div><div style="font-size:15px;font-weight:700" class="metal-text">' + esc(F.name) + '</div><div class="muted" style="font-size:11px">Mech Model · live from the scanner' + (F.hasBt ? ', earlier trades marked BACKTEST' : '') + '</div></div></div></div>' +
         '<div class="feed"><div class="feed-inner">' + (F.items || '<div class="note" style="text-align:center;padding:40px">No trades yet.' + (grp === "GBPUSD" ? " GBPUSD isn't traded on the Mech Model right now." : "") + "</div>") + "</div></div></section>";
       bindSvc(page);
-      var fi = page.querySelector(".feed"); if (fi) fi.scrollTop = fi.scrollHeight;
+      page.querySelectorAll("[data-more]").forEach(function (b) { b.onclick = function () { state.mechShow[grp] = (state.mechShow[grp] || 50) + 100; var fi = page.querySelector(".feed"), h0 = fi ? fi.scrollHeight - fi.scrollTop : 0; renderService(page); var f2 = page.querySelector(".feed"); if (f2) f2.scrollTop = f2.scrollHeight - h0; state.keepScroll = 1; }; });
+      var fi = page.querySelector(".feed"); if (fi && !state.keepScroll) fi.scrollTop = fi.scrollHeight; state.keepScroll = 0;
       return;
     }
     var run = runningTrade();
