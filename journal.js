@@ -33,7 +33,7 @@
   var D = { items: null, trades: null };
   async function load(force) {
     if (D.items && !force) return null;
-    var r = await sb().from("journal_items").select("*").order("sort", { ascending: true }).order("created_at", { ascending: true });
+    var r = await sb().from("journal_items").select("*").neq("kind", "notion").order("sort", { ascending: true }).order("created_at", { ascending: true });
     if (r.error) return r.error;
     D.items = r.data || [];
     await seed();

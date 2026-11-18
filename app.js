@@ -73,6 +73,7 @@
     support: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7"/><line x1="12" y1="17" x2="12" y2="17.01"/>',
     admin: '<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>',
     scandata: '<line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="13"/><line x1="21" y1="20" x2="3" y2="20"/>',
+    notion: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
     edu: '<path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>'
   };
   function svg(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + "</svg>"; }
@@ -82,7 +83,7 @@
     ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["scanners", "Scanners", "scanners"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
     ["PARTNERS", [["brokers", "Brokers", "brokers"], ["edu", "Educational Platform", "edu", 0, C.ELITE_PACK_URL]]],
     ["HELP", [["support", "Support", "support"]]],
-    ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"]]]
+    ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["notion", "My Notion", "notion"]]]
   ];
 
   var ELITE_ONLY = ["journal"];
@@ -237,7 +238,7 @@
     var cur = route();
     var free = isFree();
     var admin = (state.member.plan || "") === "Admin";
-    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scandata") && !admin)) { location.hash = "#/dashboard"; return; }
+    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scandata" || cur === "notion") && !admin)) { location.hash = "#/dashboard"; return; }
     var nav = NAV.filter(function (g) { return g[0] !== "ADMIN" || admin; }).map(function (g) {
       return '<div class="group"><div class="label">' + g[0] + "</div>" + g[1].filter(function (n) { return !(free && ELITE_ONLY.indexOf(n[0]) > -1); }).map(function (n) {
         var ext = n[4];
