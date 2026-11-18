@@ -11,7 +11,7 @@
   var TP_CHOICES = [1, 1.5, 2, 3, 4, 5, 6, 8, 10];
   var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   var RV = { TP: 2, BE: 0, SL: -1 };
-  var S = { ovSec: {}, ovPg: {}, ovTab: {}, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
+  var S = { ovSec: {}, ovPg: {}, ovTab: {}, calPair: "all", calYear: null, gr: { buf: "0.5", k: "R" }, scan: null, sec: "trades", plSort: "R", mkt: null, loadingM: {}, sl: { e: "retest", rf: 0.25, k: "R" }, year: "2025", rmYear: "all", tmYear: "all", month: null, openList: {}, ver: {}, loading: false, failed: false, tp: null };
 
   function data() { return (window.SDX_SCANDATA || {})[S.mkt] || {}; }
   function markets() { return Object.keys(window.SDX_SCANDATA_INDEX || {}); }
@@ -281,6 +281,32 @@
       b.rows.map(function (r) { return "<tr>" + r.map(function (v, i) { return pgCell(v, b.cols[i][1]); }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
     return "";
   }
+
+  // ---------- results calendar: month boxes for one year, for all traded pairs or one pair ----------
+  var CAL_PAIRS = [["all", "All traded pairs"], ["XAUUSD", "XAUUSD"], ["EURUSD", "EURUSD"], ["GER30", "GER30"], ["GBPUSD", "GBPUSD (not traded)"]];
+  var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function calendar(O) {
+    var C = O.cal, pair = C[S.calPair] ? S.calPair : "all", P = C[pair], years = Object.keys(P).sort();
+    var yr = S.calYear && P[S.calYear] ? S.calYear : years[years.length - 1];
+    var ms = P[yr], tot = 0, n = 0, w = 0, b = 0, l = 0, up = 0, had = 0;
+    ms.forEach(function (m) { if (!m) return; had++; tot += m.R; n += m.n; w += m.w; b += m.b; l += m.l; if (m.R > 0) up++; });
+    tot = Math.round(tot * 10) / 10;
+    var pairBtns = '<div class="chips">' + CAL_PAIRS.map(function (x) { return '<button class="chip' + (x[0] === pair ? " on" : "") + '" data-calp="' + x[0] + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
+    var yearBtns = '<div class="chips">' + years.map(function (y) { return '<button class="chip' + (y === yr ? " on" : "") + '" data-caly="' + y + '">' + y + (y === "2026" ? " so far" : "") + "</button>"; }).join("") + "</div>";
+    var tiles = '<div class="tiles">' + tile(yr + " total", rTxt(tot), cls(tot)) + tile("Trades", n) + tile("Wins / BE / Losses", w + " / " + b + " / " + l) +
+      tile("Win rate (W vs L)", w + l ? (Math.round(1000 * w / (w + l)) / 10) + "%" : "—") + tile("Profitable months", up + " of " + had) + "</div>";
+    var boxes = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' + ms.map(function (m, i) {
+      if (!m) return '<div style="border:1px dashed var(--line, #C9CED5);border-radius:12px;padding:12px;min-height:96px;opacity:.55"><div style="font:700 13px var(--sg)">' + MON[i] + '</div><div class="note" style="font-size:12px;margin-top:6px">No trades / no data</div></div>';
+      var bg = m.R > 0 ? "rgba(22,195,90,.14)" : m.R < 0 ? "rgba(255,77,77,.14)" : "rgba(140,146,156,.16)";
+      var bd = m.R > 0 ? "#16C35A" : m.R < 0 ? "#FF4D4D" : "#8C929C";
+      return '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:12px;padding:12px;min-height:96px;display:flex;flex-direction:column;gap:4px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 13px var(--sg)">' + MON[i] + '</span><span class="note" style="font-size:11px">' + m.n + " trades</span></div>" +
+        '<div style="font:700 22px var(--sg);color:' + bd + '">' + rTxt(m.R) + "</div>" +
+        '<div class="note" style="font-size:11px">W ' + m.w + " · BE " + m.b + " · L " + m.l + "</div></div>";
+    }).join("") + "</div>";
+    var note = '<div class="note" style="font-size:12px">Green = profitable month, red = losing month, grey = breakeven. All traded pairs = XAUUSD + EURUSD + GER30, same risk on every trade (GBPUSD isn\'t traded, so it\'s left out). Data: XAUUSD Jan 2022 - Nov 2026 (no June 2026), EURUSD 2023-2025, GER30 Jan 2022 - May 2026. No spread. Tap a pair to see all its data below.</div>';
+    return card('<span class="eyebrow">FAILED BREAK MODEL · RESULTS ' + esc(yr) + (yr === "2026" ? " SO FAR" : "") + " · " + esc(CAL_PAIRS.filter(function (x) { return x[0] === pair; })[0][1].toUpperCase()) + "</span>" + pairBtns + yearBtns + tiles + boxes + note);
+  }
   function overview() {
     var d = D(S.scan), O = d.overview, b = O.best;
     var tiles = '<div class="tiles">' + tile("Total R", rTxt(b.R), cls(b.R)) + tile("R a year (average)", rTxt(Math.round((b.R / Math.max(spanYears(d), 0.5)) * 10) / 10), cls(b.R)) + tile("Trades", b.n) +
@@ -297,7 +323,7 @@
     var P = [["sum", "Summary"]].concat(O.pages.map(function (x) { return [x.id, x.name]; })).concat([["what", "What if"]]);
     var pg = S.ovPg[S.scan] || "sum";
     var nav = '<div class="chips">' + P.map(function (x) { return '<button class="chip' + (x[0] === pg ? " on" : "") + '" data-ovp="' + esc(x[0]) + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
-    if (pg === "sum") return nav + bestCard;
+    if (pg === "sum") return nav + (O.cal ? calendar(O) : "") + bestCard;
     if (pg === "what") return nav + whatCard;
     var page = O.pages.filter(function (x) { return x.id === pg; })[0] || O.pages[0];
     return nav + card('<span class="eyebrow">' + esc(page.name.toUpperCase()) + "</span>" + page.blocks.map(pgBlock).join(""));
@@ -411,12 +437,12 @@
   // ---------- step 2: the scanner's page ----------
   function render(redraw) {
     if (S.failed) return '<div class="note">Couldn\'t load the scanner results. Refresh the page to try again.</div>';
-    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=33", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
+    if (!window.SDX_SCANDATA_INDEX) { load("scanner-data-index.js?v=34", "index", redraw); return '<div class="note">Loading scanner results…</div>'; }
     if (!S.scan) return picker();
     var ms = scanMarkets(S.scan);
     if (!ms.length) return '<button class="btn btn-ghost" data-sdscan="">All scanners and models</button><div class="note">' + esc(scName(S.scan)) + " hasn't been tested yet.</div>";
     if (ms.indexOf(S.mkt) < 0) S.mkt = ms[0];
-    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=33", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
+    if (!(window.SDX_SCANDATA || {})[S.mkt]) { load("scanner-data-" + S.mkt + ".js?v=34", S.mkt, redraw); return '<div class="note">Loading ' + esc(S.mkt) + " results…</div>"; }
     var ys = years();
     if (S.year !== "all" && ys.indexOf(S.year) < 0) { S.year = "all"; S.month = null; }
     if (S.rmYear !== "all" && ys.indexOf(S.rmYear) < 0) S.rmYear = "all";
@@ -433,6 +459,8 @@
   function wire(page, redraw) {
     $$("[data-sdscan]", page).forEach(function (b) { b.onclick = function () { S.scan = b.dataset.sdscan || null; S.month = null; S.sec = "overview"; redraw(); window.scrollTo(0, 0); }; });
     $$("[data-ovtab]", page).forEach(function (b) { b.onclick = function () { S.ovTab[S.scan + (S.ovPg[S.scan] || "")] = +b.dataset.ovtab; redraw(); }; });
+    $$("[data-calp]", page).forEach(function (b) { b.onclick = function () { S.calPair = b.dataset.calp; if (S.calPair !== "all") { S.mkt = S.calPair; S.month = null; } redraw(); }; });
+    $$("[data-caly]", page).forEach(function (b) { b.onclick = function () { S.calYear = b.dataset.caly; redraw(); }; });
     $$("[data-ovp]", page).forEach(function (b) { b.onclick = function () { S.ovPg[S.scan] = b.dataset.ovp; redraw(); }; });
     $$("[data-ovs]", page).forEach(function (b) { b.onclick = function () { S.ovSec[S.scan] = b.dataset.ovs; redraw(); }; });
     $$("[data-ovver]", page).forEach(function (b) { b.onclick = function () { S.ver[S.scan + S.mkt] = b.dataset.ovver; S.sec = "trades"; S.year = "all"; S.month = null; redraw(); window.scrollTo(0, 0); }; });
