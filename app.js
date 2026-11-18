@@ -394,7 +394,7 @@
   }
   function loadBt(pair) {
     window.SDX_MECHBT = window.SDX_MECHBT || {};
-    if (pair === "GBPUSD" || window.SDX_MECHBT[pair]) return Promise.resolve();
+    if (window.SDX_MECHBT[pair]) return Promise.resolve();
     return new Promise(function (ok) { var sc = document.createElement("script"); sc.src = "mech-bt-" + pair + ".js?v=1"; sc.onload = ok; sc.onerror = ok; document.head.appendChild(sc); });
   }
   function mechFeed(pair) {
@@ -522,14 +522,14 @@
     var grp = state.svcGroup || "ideas";
     if (grp !== "ideas") {
       if (!state.mech) { page.innerHTML = '<div class="note">Loading…</div>'; loadMech().then(function () { renderService(page); }); return; }
-      if (grp !== "tracker" && grp !== "GBPUSD" && !(window.SDX_MECHBT && window.SDX_MECHBT[grp])) { page.innerHTML = '<div class="note">Loading…</div>'; loadBt(grp).then(function () { renderService(page); }); return; }
+      if (grp !== "tracker" && !(window.SDX_MECHBT && window.SDX_MECHBT[grp])) { page.innerHTML = '<div class="note">Loading…</div>'; loadBt(grp).then(function () { renderService(page); }); return; }
       if (grp === "tracker") { renderTrackerTab(page); return; }
       var F = mechFeed(grp);
       page.innerHTML =
         '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
         '<section class="pinned' + (F.run ? " live" : "") + '"><div style="display:flex;align-items:center;gap:12px"><span class="eyebrow">PINNED</span><span style="font-size:14px;font-weight:600">' + (F.run || "No current running trades") + '</span></div><span class="muted" style="font-size:12px">' + (F.run ? "Running now" : "A running trade pins here first") + "</span></section>" +
         '<section class="card"><div class="feed-head"><div class="who"><div class="pic"><img src="' + LOGO + '" alt=""></div><div><div style="font-size:15px;font-weight:700" class="metal-text">' + esc(F.name) + '</div><div class="muted" style="font-size:11px">Mech Model · live from the scanner' + (F.hasBt ? ', earlier trades marked BACKTEST' : '') + '</div></div></div></div>' +
-        '<div class="feed"><div class="feed-inner">' + (F.items || '<div class="note" style="text-align:center;padding:40px">No trades yet.' + (grp === "GBPUSD" ? " GBPUSD isn't traded on the Mech Model right now." : "") + "</div>") + "</div></div></section>";
+        '<div class="feed"><div class="feed-inner">' + (F.items || '<div class="note" style="text-align:center;padding:40px">No trades yet.' + "</div>") + "</div></div></section>";
       bindSvc(page);
       page.querySelectorAll("[data-more]").forEach(function (b) { b.onclick = function () { state.mechShow[grp] = (state.mechShow[grp] || 50) + 100; var fi = page.querySelector(".feed"), h0 = fi ? fi.scrollHeight - fi.scrollTop : 0; renderService(page); var f2 = page.querySelector(".feed"); if (f2) f2.scrollTop = f2.scrollHeight - h0; state.keepScroll = 1; }; });
       var fi = page.querySelector(".feed"); if (fi && !state.keepScroll) fi.scrollTop = fi.scrollHeight; state.keepScroll = 0;
