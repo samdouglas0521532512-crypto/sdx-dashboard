@@ -482,28 +482,32 @@
     return cal;
   }
   function renderTrackerTab(page) {
-    var TP = [["all", "All pairs"], ["XAUUSD", "XAUUSD"], ["EURUSD", "EURUSD"], ["GER30", "GER30"]];
+    var TP = [["all", "All pairs"], ["XAUUSD", "XAUUSD"], ["EURUSD", "EURUSD"], ["GER30", "GER30"], ["GBPUSD", "GBPUSD"]];
     var pair = state.trBt || "all";
-    // backtest months, then live closed trades added on top (they start after the backtest data ends)
-    var B = JSON.parse(JSON.stringify((window.SDX_TRACK && window.SDX_TRACK.cal[pair]) || {})), L = liveCal(pair);
+    var B = JSON.parse(JSON.stringify((window.SDX_TRACK && window.SDX_TRACK.cal[pair]) || {})), L = liveCal(pair), src = {};
+    Object.keys(B).forEach(function (y) { src[y] = { bt: 1, live: 0 }; });
     Object.keys(L).forEach(function (y) {
       B[y] = B[y] || [null, null, null, null, null, null, null, null, null, null, null, null];
+      src[y] = src[y] || { bt: 0, live: 0 }; src[y].live = 1;
       L[y].forEach(function (m, i) { if (!m) return; var o = B[y][i] = B[y][i] || { R: 0, n: 0 }; o.R += m.R; o.n += m.n; });
     });
-    var years = Object.keys(B).sort(), yr = state.trBtY && B[state.trBtY] ? state.trBtY : years[years.length - 1];
-    var boxes = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">' + (B[yr] || []).map(function (m, i) {
-      if (!m || !m.n) return '<div style="border:1px dashed #2a2b2f;border-radius:12px;padding:14px;min-height:84px;opacity:.5"><div style="font:700 13px var(--sg)">' + TR_MON[i] + "</div></div>";
-      var R = Math.round(m.R * 10) / 10, c = trCol(R), bg = R > 0 ? "rgba(22,195,90,.12)" : R < 0 ? "rgba(255,77,77,.12)" : "rgba(140,146,156,.14)";
-      return '<div style="background:' + bg + ';border:1px solid ' + c + ';border-radius:12px;padding:14px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between"><div style="font:700 13px var(--sg)">' + TR_MON[i] + '</div><div style="font:700 22px var(--sg);color:' + c + '">' + trR(R) + "</div></div>";
-    }).join("") + "</div>";
+    var years = Object.keys(B).sort();
+    var yearBlock = function (y) {
+      var tot = 0;
+      var boxes = B[y].map(function (m, i) {
+        if (!m || !m.n) return '<div style="border:1px dashed #2a2b2f;border-radius:12px;padding:12px;min-height:76px;opacity:.5"><div style="font:700 13px var(--sg)">' + TR_MON[i] + "</div></div>";
+        var R = Math.round(m.R * 10) / 10, c = trCol(R), bg = R > 0 ? "rgba(22,195,90,.12)" : R < 0 ? "rgba(255,77,77,.12)" : "rgba(140,146,156,.14)"; tot += m.R;
+        return '<div style="background:' + bg + ';border:1px solid ' + c + ';border-radius:12px;padding:12px;min-height:76px;display:flex;flex-direction:column;justify-content:space-between"><div style="font:700 13px var(--sg)">' + TR_MON[i] + '</div><div style="font:700 20px var(--sg);color:' + c + '">' + trR(R) + "</div></div>";
+      }).join("");
+      var tag = src[y].bt ? '<span class="tag" style="background:#1c1c1e;color:#8c929c;font-size:10px">' + (src[y].live ? "BACKTESTED + LIVE" : "BACKTESTED") + "</span>" : "";
+      return '<div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font:700 16px var(--sg)">' + y + '</span><span style="font:600 14px var(--sg);color:' + trCol(Math.round(tot * 10) / 10) + '">' + trR(tot) + "</span>" + tag + "</div>" +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:10px">' + boxes + "</div></div>";
+    };
     page.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">TRADE SERVICE</div><h1 class="title">Trade <span class="metal-text">service.</span></h1></div>' + svcTabs() +
-      '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">TRACKER · MECH MODEL</div>' + trChips(TP, pair, "data-trb") +
-      (years.length ? trChips(years.map(function (y) { return [y, y]; }), yr, "data-trby") + boxes : '<div class="note">No results yet.</div>') +
-      '<div class="muted" style="font-size:12px">Results in R. Green = profitable month, red = losing month, grey = breakeven. Months before the scanner went live are backtested.</div></section>';
+      '<section class="card pad" style="display:flex;flex-direction:column;gap:22px"><div class="eyebrow">TRACKER · MECH MODEL</div>' + trChips(TP, pair, "data-trb") +
+      (years.length ? years.map(yearBlock).join("") : '<div class="note">No results yet.</div>') + "</section>";
     bindSvc(page);
-    [["data-trb", "trBt"], ["data-trby", "trBtY"]].forEach(function (a) {
-      page.querySelectorAll("[" + a[0] + "]").forEach(function (b) { b.onclick = function () { state[a[1]] = b.getAttribute(a[0]); renderTrackerTab(page); }; });
-    });
+    page.querySelectorAll("[data-trb]").forEach(function (b) { b.onclick = function () { state.trBt = b.getAttribute("data-trb"); renderTrackerTab(page); }; });
   }
   function bindSvc(page) {
     page.querySelectorAll("[data-svc]").forEach(function (b) {
