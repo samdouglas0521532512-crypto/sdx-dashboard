@@ -337,6 +337,86 @@
     if (/auction|bond|note/.test(t)) return ["The government borrowing money. The rate it pays shows how much interest investors want.", "A higher rate than before can support " + c + ".", "A lower rate than before can weigh on " + c + "."];
     return ["A scheduled report for " + ccy + ". Bigger surprises against the forecast usually mean bigger moves.", "Better than forecast usually helps " + c + ".", "Worse than forecast usually weighs on " + c + "."];
   }
+
+  // ---------- deeper news breakdown: what the market expects, possible moves, pairs to watch ----------
+  var PAIRS = {
+    USD: [["EURUSD", -1], ["GBPUSD", -1], ["XAUUSD", -1], ["USDJPY", 1]],
+    GBP: [["GBPUSD", 1], ["GBPJPY", 1], ["EURGBP", -1]],
+    EUR: [["EURUSD", 1], ["EURGBP", 1], ["EURJPY", 1], ["GER30", 0]],
+    JPY: [["USDJPY", -1], ["GBPJPY", -1], ["EURJPY", -1]],
+    AUD: [["AUDUSD", 1], ["AUDJPY", 1]], NZD: [["NZDUSD", 1]], CAD: [["USDCAD", -1]], CHF: [["USDCHF", -1]],
+    CNY: [["AUDUSD", 1], ["NZDUSD", 1]]
+  };
+  function numOf(v) { var m = String(v || "").replace(/,/g, "").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+  function newsKind(title) {
+    var t = title.toLowerCase();
+    if (/holiday/.test(t)) return "holiday";
+    if (/unemployment rate|claims|jobless/.test(t)) return "unemp";
+    if (/cpi|inflation|pce|ppi|price/.test(t)) return "infl";
+    if (/employment|payroll|non-farm|jobs/.test(t)) return "jobs";
+    if (/gdp/.test(t)) return "gdp";
+    if (/retail sales|spending/.test(t)) return "retail";
+    if (/pmi|ism|sentiment|confidence|survey/.test(t)) return "pmi";
+    if (/rate decision|cash rate|bank rate|funds rate|interest rate|official rate|main refinancing/.test(t)) return "rate";
+    if (/speaks|testifies|speech|press conference|statement|minutes/.test(t)) return "talk";
+    if (/auction|bond|note/.test(t)) return "auction";
+    return "other";
+  }
+  var EXPECT = {
+    infl: ["prices rising faster than last time", "prices rising slower than last time", "prices rising at about the same speed as last time"],
+    jobs: ["more jobs than last time", "fewer jobs than last time", "about the same number of jobs as last time"],
+    unemp: ["more people out of work than last time", "fewer people out of work than last time", "about the same as last time"],
+    gdp: ["faster growth than last time", "slower growth than last time", "about the same growth as last time"],
+    retail: ["people spending more than last time", "people spending less than last time", "spending about the same as last time"],
+    pmi: ["businesses feeling better than last time", "businesses feeling worse than last time", "businesses feeling about the same as last time"],
+    rate: ["a rate rise", "a rate cut", "rates staying where they are"],
+    auction: ["a higher rate than last time", "a lower rate than last time", "about the same rate as last time"],
+    other: ["a higher number than last time", "a lower number than last time", "about the same as last time"]
+  };
+  function dirWord(n) { return n > 0 ? "up" : "down"; }
+  function outlook(e, all) {
+    var ccy = e[1], title = e[2], kind = newsKind(title), c = CCY[ccy] || ccy;
+    if (kind === "holiday") return "";
+    var f = numOf(e[4]), p = numOf(e[5]), inv = kind === "unemp" ? -1 : 1, out = "";
+    // what the market expects
+    var exp;
+    if (kind === "talk") exp = "There is no number to forecast here. The market reacts to the tone: does it sound worried about prices rising, or does it hint at cutting rates?";
+    else if (f !== null && p !== null) {
+      var d = f > p ? 0 : f < p ? 1 : 2, lean = d === 2 ? 0 : (d === 0 ? 1 : -1) * inv;
+      exp = "Forecast is " + esc(e[4]) + " against " + esc(e[5]) + " last time, so the market is expecting " + EXPECT[kind][d] + "." +
+        (lean ? " That means traders are already leaning towards " + c + " being " + (lean > 0 ? "stronger" : "weaker") + " going in. The biggest moves usually come when the number surprises the other way." : " There is no strong lean going in, so the move comes from how far the real number lands from " + esc(e[4]) + ".");
+    } else if (p !== null) exp = "There is no forecast for this one, so the market will compare it with last time (" + esc(e[5]) + "). Anything well above or below that can move " + c + ".";
+    else exp = "There is no forecast or previous number shown, so watch the first reaction. Bigger surprises usually mean bigger moves.";
+    out += '<div><div class="eyebrow">WHAT THE MARKET EXPECTS</div><div style="font-size:14px;line-height:1.6;margin-top:4px">' + exp + "</div></div>";
+    // possible moves on the pairs
+    var prs = PAIRS[ccy] || [];
+    if (prs.length) {
+      var hiLab = kind === "talk" ? "SOUNDS WORRIED ABOUT PRICES" : "IF HIGHER THAN FORECAST", loLab = kind === "talk" ? "HINTS AT CUTTING RATES" : "IF LOWER THAN FORECAST";
+      out += '<div><div class="eyebrow">POSSIBLE MOVES</div><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:0;margin-top:6px;font-size:13px;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 0 1px #1f2023">' +
+        '<div style="padding:8px 12px;color:#6b7078;font-size:10px;letter-spacing:.12em">PAIR</div><div style="padding:8px 12px;color:#6b7078;font-size:10px;letter-spacing:.12em">' + hiLab + '</div><div style="padding:8px 12px;color:#6b7078;font-size:10px;letter-spacing:.12em">' + loLab + "</div>" +
+        prs.map(function (x) {
+          var up = x[1] * inv;
+          var a = x[1] === 0 ? "Can move hard" : '<span class="' + (up > 0 ? "pos" : "neg") + '" style="font-weight:600">Likely ' + dirWord(up) + "</span>";
+          var b = x[1] === 0 ? "Can move hard" : '<span class="' + (up > 0 ? "neg" : "pos") + '" style="font-weight:600">Likely ' + dirWord(-up) + "</span>";
+          return '<div style="padding:8px 12px;border-top:1px solid #18181a;font-weight:600">' + x[0] + '</div><div style="padding:8px 12px;border-top:1px solid #18181a">' + a + '</div><div style="padding:8px 12px;border-top:1px solid #18181a">' + b + "</div>";
+        }).join("") + "</div>" +
+        '<div class="note" style="font-size:12px;margin-top:6px">If it lands right on the forecast, the move is usually smaller and price often goes back to following the structure it was already in.</div></div>';
+    }
+    // other news for the same currency this week
+    var others = [];
+    (all || []).forEach(function (dd) { dd[1].forEach(function (o) { if (o[1] === ccy && o[2] !== title && o[3] !== "low" && !o[6]) others.push([dd[0], o]); }); });
+    if (others.length) {
+      out += '<div><div class="eyebrow">OTHER ' + esc(ccy) + ' NEWS THIS WEEK</div><div style="font-size:13px;line-height:1.6;margin-top:4px">' +
+        others.slice(0, 5).map(function (x) {
+          var day = new Date(x[0] + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short" });
+          return esc(day) + " " + esc(x[1][0]) + " · " + esc(x[1][2]) + (x[1][3] === "high" ? ' <span class="neg" style="font-size:10px;font-weight:700">HIGH</span>' : "");
+        }).join("<br>") + '</div><div class="note" style="font-size:12px;margin-top:4px">A bigger release later in the week can undo the move from this one, so keep the whole week in mind.</div></div>';
+    }
+    // how price often moves on the release
+    if (e[3] !== "low") out += '<div><div class="eyebrow">ON THE RELEASE</div><div style="font-size:13px;line-height:1.6;margin-top:4px">Price often goes quiet and ranges before the number, building liquidity above and below. The first spike is often just the sweep of one side, with the real move the other way. After the release, mark the news candle high and low, because price often comes back for them later.</div></div>';
+    out += '<div class="note" style="font-size:11px">These are possible moves based on how this news usually affects price, not a promise. News gives you the timing, structure decides the direction.</div>';
+    return out;
+  }
   var LIVE_WEEK = null, calLoading = false, calSource = "sample";
   function loadCalendar(page) {
     var url = window.SDX_CONFIG && window.SDX_CONFIG.AUTH_URL;
@@ -380,7 +460,7 @@
         html += '<button class="ev" data-k="' + esc(key) + '" aria-expanded="' + open + '" style="grid-template-columns:64px 64px minmax(0,1fr) 90px 90px;background:linear-gradient(90deg,' + tint + ' 0%,' + tint + ' 60%,transparent 100%)"><span style="color:#d6d8dc">' + esc(e[0]) + '</span><span style="font-weight:700;color:' + col + '"><span class="dot" style="background:' + col + ';margin-right:6px;box-shadow:0 0 8px ' + col + '"></span>' + esc(e[1]) + '</span><span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' + esc(e[2]) + '<span style="font-size:9px;font-weight:700;letter-spacing:.12em;padding:3px 7px;border-radius:4px;background:' + tint.replace(/0\.\d+\)$/, "0.22)") + ';color:' + col + '">' + lab + '</span></span><span class="hide-sm" style="color:#d6d8dc">' + esc(e[4]) + '</span><span class="hide-sm muted">' + esc(e[5]) + "</span></button>";
         if (open) html += '<div class="expl"><div><div class="eyebrow">WHAT IS IT</div><div style="font-size:14px;line-height:1.6;margin-top:4px">' + esc(x[0]) + '</div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">' +
           '<div style="padding:12px 14px;border-radius:10px;background:rgba(127,217,154,.06);box-shadow:inset 0 0 0 1px rgba(127,217,154,.25)"><div class="pos" style="font-size:11px;font-weight:600">' + (hol ? "WHAT TO EXPECT" : "IF IT COMES IN HIGHER") + '</div><div style="font-size:13px;line-height:1.55;margin-top:4px">' + esc(x[1]) + "</div></div>" +
-          '<div style="padding:12px 14px;border-radius:10px;background:rgba(255,138,138,.06);box-shadow:inset 0 0 0 1px rgba(255,138,138,.25)"><div class="neg" style="font-size:11px;font-weight:600">' + (hol ? "WATCH OUT FOR" : "IF IT COMES IN LOWER") + '</div><div style="font-size:13px;line-height:1.55;margin-top:4px">' + esc(x[2]) + "</div></div></div></div>";
+          '<div style="padding:12px 14px;border-radius:10px;background:rgba(255,138,138,.06);box-shadow:inset 0 0 0 1px rgba(255,138,138,.25)"><div class="neg" style="font-size:11px;font-weight:600">' + (hol ? "WATCH OUT FOR" : "IF IT COMES IN LOWER") + '</div><div style="font-size:13px;line-height:1.55;margin-top:4px">' + esc(x[2]) + "</div></div></div>" + outlook(e, weekData) + "</div>";
       });
       html += "</section>";
     });
