@@ -233,6 +233,27 @@
   async function loadMember() {
     var r = await sb.from("members").select("email,name,plan,active").maybeSingle();
     state.member = r.data && r.data.active ? r.data : null;
+    // admins can look at the dashboard as each member type ("View as")
+    state.realPlan = state.member ? state.member.plan : null;
+    var va = null; try { va = sessionStorage.getItem("sdx_viewas"); } catch (x) {}
+    if (state.member && state.realPlan === "Admin" && va && va !== "Admin") state.member = Object.assign({}, state.member, { plan: va });
+  }
+
+  // ---------- view as (admins only) ----------
+  var VIEW_AS = [["Admin", "Admin"], ["Elite Pack", "Elite"], ["Trade Service", "Free"]];
+  function viewAsBar() {
+    if (state.realPlan !== "Admin") return "";
+    var cur = state.member.plan, other = cur !== "Admin";
+    return '<div class="viewas' + (other ? " on" : "") + '"><span class="eyebrow">' + (other ? "DEMO · YOU ARE VIEWING AS " + esc(cur === "Elite Pack" ? "AN ELITE MEMBER" : "A FREE MEMBER") : "VIEW AS") + '</span><div class="tabs">' +
+      VIEW_AS.map(function (v) { return '<button class="tab' + (cur === v[0] ? " on" : "") + '" data-viewas="' + v[0] + '">' + v[1] + "</button>"; }).join("") + "</div></div>";
+  }
+  function bindViewAs() {
+    document.querySelectorAll("[data-viewas]").forEach(function (b) {
+      b.onclick = function () {
+        try { sessionStorage.setItem("sdx_viewas", b.dataset.viewas); } catch (x) {}
+        location.hash = "#/dashboard"; location.reload();
+      };
+    });
   }
 
   // ---------- shell ----------
@@ -255,8 +276,9 @@
       '<div class="mbar"><button class="mbtn" id="menuBtn" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>' + brand() + '<button class="theme-btn" type="button"></button></div>' +
       '<div class="shell"><div class="scrim" id="scrim"></div><nav class="side" id="side" aria-label="Main menu">' + brand() + nav +
       '<div class="me"><div class="avatar">' + esc(initials) + '</div><div><div class="name">' + esc(nm) + '</div><div class="plan">' + esc(state.member.plan || "Elite Pack") + '</div></div><button id="out">Sign out</button></div></nav>' +
-      '<main class="main"><div class="topbar"><span>' + esc(titles[cur] || "Coming soon") + '</span><span class="right"><button class="theme-btn" type="button"></button><span class="live-dot">LIVE</span></span></div><div id="page" style="display:flex;flex-direction:column;gap:26px"></div></main></div>';
+      '<main class="main"><div class="topbar"><span>' + esc(titles[cur] || "Coming soon") + '</span><span class="right"><button class="theme-btn" type="button"></button><span class="live-dot">LIVE</span></span></div>' + viewAsBar() + '<div id="page" style="display:flex;flex-direction:column;gap:26px"></div></main></div>';
     document.getElementById("out").onclick = function () { sb.auth.signOut(); };
+    bindViewAs();
     var tbs = document.querySelectorAll(".theme-btn");
     function themeLabel() { tbs.forEach(function (b) { b.textContent = document.documentElement.dataset.theme === "light" ? "DARK MODE" : "WHITE MODE"; }); }
     themeLabel();
@@ -456,6 +478,7 @@
     return { items: items, run: run, name: cfg[1], hasBt: !!((window.SDX_MECHBT || {})[pair] || []).length };
   }
   function isOwner() {
+    if (state.member && state.member.plan !== "Admin") return false;
     var e = ((state.session && state.session.user && state.session.user.email) || "").toLowerCase();
     return (C.OWNER_EMAILS || []).map(function (x) { return x.toLowerCase(); }).indexOf(e) > -1;
   }
