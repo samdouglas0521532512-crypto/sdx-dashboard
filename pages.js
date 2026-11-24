@@ -953,11 +953,11 @@
   }
 
   // ======================= AI COACH =======================
-  var COACH = { msgs: [], busy: false };
+  var COACH = { msgs: [], busy: false, pending: [], up: false, err: "" };
   async function askCoach(page, text, mode) {
     if (COACH.busy) return;
     COACH.busy = true;
-    if (text) COACH.msgs.push({ role: "user", content: text });
+    if (text || COACH.pending.length) { COACH.msgs.push({ role: "user", content: text || "What can you see on this chart?", images: COACH.pending.slice(0, 3) }); COACH.pending = []; }
     drawCoach(page);
     var reply;
     try {
@@ -972,15 +972,26 @@
   function drawCoach(page) {
     var chat = COACH.msgs.map(function (m) {
       var me = m.role === "user";
-      return '<div style="max-width:620px;align-self:' + (me ? "flex-end" : "flex-start") + ';border-radius:' + (me ? "16px 4px 16px 16px" : "4px 16px 16px 16px") + ';padding:12px 15px;font-size:14px;line-height:1.6;white-space:pre-wrap;' + (me ? "background:var(--metal);color:#0a0a0a" : "background:var(--t-121214);box-shadow:inset 0 0 0 1px var(--t-222326)") + '">' + esc(m.content) + "</div>";
+      return '<div style="max-width:620px;align-self:' + (me ? "flex-end" : "flex-start") + ';border-radius:' + (me ? "16px 4px 16px 16px" : "4px 16px 16px 16px") + ';padding:12px 15px;font-size:14px;line-height:1.6;white-space:pre-wrap;' + (me ? "background:var(--metal);color:#0a0a0a" : "background:var(--t-121214);box-shadow:inset 0 0 0 1px var(--t-222326)") + '">' + (m.images && m.images.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' + m.images.map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="Chart" style="width:160px;max-height:110px;object-fit:cover;border-radius:8px;display:block"></a>'; }).join("") + "</div>" : "") + esc(m.content) + "</div>";
     }).join("");
     page.innerHTML = '<section class="hero" style="min-height:170px"><div class="eyebrow">SD TRADING EDUCATION</div><h1>AI coach.</h1><div style="font-size:14px;color:#2a2c30">Explains market structure, liquidity, FVGs and more, reviews your results and checks your risk.</div></section>' +
       '<div class="chips"><button class="chip" data-mode="review">Review my results</button><button class="chip" data-mode="risk">Check my risk</button></div>' +
-      '<section class="card" style="display:flex;flex-direction:column"><div style="min-height:320px;max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:20px" id="coachLog">' + (chat || '<div class="note" style="margin:auto;text-align:center;max-width:380px">Ask anything about market structure, liquidity, fair value gaps, balanced price ranges, risk or your results. Or tap Review my results above.</div>') + (COACH.busy ? '<div class="note">Thinking…</div>' : "") + "</div>" +
-      '<form id="coachForm" style="display:flex;gap:10px;padding:14px;border-top:1px solid var(--t-18181a)"><input class="input" id="coachIn" placeholder="e.g. What is a fair value gap?" autocomplete="off"><button class="btn btn-metal" type="submit">Send</button></form></section>' +
+      '<section class="card" style="display:flex;flex-direction:column"><div style="min-height:320px;max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:20px" id="coachLog">' + (chat || '<div class="note" style="margin:auto;text-align:center;max-width:380px">Ask anything about market structure, liquidity, fair value gaps, balanced price ranges, risk or your results. You can also add a chart screenshot and ask about it.</div>') + (COACH.busy ? '<div class="note">Thinking…</div>' : "") + "</div>" +
+      (COACH.pending.length || COACH.up || COACH.err ? '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 14px 0">' + COACH.pending.map(function (u, i) { return '<span style="position:relative"><img src="' + esc(u) + '" alt="Chart" style="width:84px;height:58px;object-fit:cover;border-radius:8px;display:block"><button type="button" data-unpin="' + i + '" aria-label="Remove" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;cursor:pointer;background:#0a0a0a;color:#fff;font-size:13px;line-height:1">×</button></span>'; }).join("") + (COACH.up ? '<span class="note">Uploading…</span>' : "") + (COACH.err ? '<span class="note neg">' + esc(COACH.err) + "</span>" : "") + "</div>" : "") +
+      '<form id="coachForm" style="display:flex;gap:10px;padding:14px;border-top:1px solid var(--t-18181a)"><label class="btn btn-ghost" title="Add a chart screenshot" style="cursor:pointer;flex:none;padding:0 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg><span class="hide-sm">Chart</span><input type="file" id="coachImg" accept="image/*" multiple style="display:none"></label><input class="input" id="coachIn" placeholder="e.g. What is a fair value gap? Or add a chart and ask about it." autocomplete="off"><button class="btn btn-metal" type="submit">Send</button></form></section>' +
       '<div class="note" style="font-size:11px">The coach is here to help you learn. It is not financial advice.</div>';
     var log = $("#coachLog", page); log.scrollTop = log.scrollHeight;
-    $("#coachForm", page).onsubmit = function (e) { e.preventDefault(); var t = $("#coachIn", page).value.trim(); if (t) askCoach(page, t, "chat"); };
+    $("#coachForm", page).onsubmit = function (e) { e.preventDefault(); if (COACH.up) return; var t = $("#coachIn", page).value.trim(); if (t || COACH.pending.length) askCoach(page, t, "chat"); };
+    $("#coachImg", page).onchange = async function (e) {
+      var files = Array.prototype.slice.call(e.target.files || []).slice(0, 3 - COACH.pending.length);
+      if (!files.length) return;
+      var typed = $("#coachIn", page).value;
+      COACH.up = true; COACH.err = ""; drawCoach(page);
+      try { for (var i = 0; i < files.length; i++) COACH.pending.push(await window.SDX_UPLOAD(files[i])); }
+      catch (er) { COACH.err = "Couldn't add the image. Try again."; }
+      COACH.up = false; drawCoach(page); $("#coachIn", page).value = typed;
+    };
+    $$("[data-unpin]", page).forEach(function (b) { b.onclick = function () { COACH.pending.splice(+b.dataset.unpin, 1); var typed = $("#coachIn", page).value; drawCoach(page); $("#coachIn", page).value = typed; }; });
     $$("[data-mode]", page).forEach(function (b) { b.onclick = function () { askCoach(page, b.dataset.mode === "review" ? "Review my results" : "Check my risk", b.dataset.mode); }; });
   }
   P.coach = function (page) { drawCoach(page); };

@@ -9,6 +9,7 @@
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
   var S = { tab: "overview", q: "", plan: "all", sort: "active", open: null, detail: null, reqFilter: "requested", msg: "" };
+  var RV = { rows: null, filter: "waiting", draft: {}, msg: "" };
   var SCAN_NAMES = { platinum: "SDX Sniper", chrome: "SDX Pulse", titanium: "SDX Precision", obsidian: "SDX Phantom", cobalt: "SDX Raid", iridium: "SDX Ghost" };
 
   function head(sub) {
@@ -48,7 +49,8 @@
   // ---------- tabs (shared with the Access tab in pages.js) ----------
   function tabs() {
     var pend = allReqs().filter(function (r) { return r.status === "requested"; }).length;
-    var t = [["overview", "Overview"], ["students", "Students"], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
+    var rw = (RV.rows || []).filter(function (x) { return (x.data || {}).status !== "reviewed"; }).length;
+    var t = [["overview", "Overview"], ["students", "Students"], ["reviews", "Trade reviews" + (rw ? " (" + rw + ")" : "")], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
     return '<div class="chips" style="margin-top:4px">' + t.map(function (x) { return '<button class="chip' + (S.tab === x[0] ? " on" : "") + '" data-atab="' + x[0] + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
   }
   function wire(page) {
@@ -206,12 +208,13 @@
     if (S.tab === "access") { C().drawAccess(page); return; }
     var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack."}[S.tab];
     page.innerHTML = head(sub) + tabs() + (S.msg ? '<div class="note">' + esc(S.msg) + "</div>" : "") +
-      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
+      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "reviews" ? reviewsTab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
     wire(page);
     wireImport(page);
     $$("[data-open]", page).forEach(function (b) { b.onclick = function () { openStudent(page, b.dataset.open); }; });
     $$("[data-ap]", page).forEach(function (b) { b.onclick = function () { S.plan = b.dataset.ap; draw(page); }; });
     $$("[data-rf]", page).forEach(function (b) { b.onclick = function () { S.reqFilter = b.dataset.rf; draw(page); }; });
+    wireReviews(page);
     var q = $("#aQ", page);
     if (q) q.oninput = function () { S.q = q.value; var pos = q.selectionStart; draw(page); var n = $("#aQ", page); n.focus(); n.setSelectionRange(pos, pos); };
     var so = $("#aSort", page); if (so) so.onchange = function () { S.sort = so.value; draw(page); };
@@ -242,9 +245,52 @@
     }
   }
 
+
+  // ---------- trade reviews ----------
+  function reviewsTab() {
+    if (RV.rows === null) return '<div class="note">Loading trade reviews…</div>';
+    var R = window.SDX_REVIEW_PARTS;
+    var rows = RV.rows.filter(function (x) { var st = (x.data || {}).status === "reviewed" ? "done" : "waiting"; return RV.filter === "all" || RV.filter === st; });
+    return (RV.msg ? '<div class="note">' + esc(RV.msg) + "</div>" : "") +
+      '<div class="chips">' + [["waiting", "Waiting"], ["done", "Reviewed"], ["all", "All"]].map(function (f) { return '<button class="chip' + (RV.filter === f[0] ? " on" : "") + '" data-rvf="' + f[0] + '">' + f[1] + "</button>"; }).join("") + "</div>" +
+      (!rows.length ? '<div class="card pad note" style="text-align:center">' + (RV.filter === "waiting" ? "No trades waiting for a review." : "Nothing here yet.") + "</div>" :
+        rows.map(function (x) {
+          var d = x.data || {}, done = d.status === "reviewed";
+          return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:6px">' + R.facts(d) +
+            '<span class="muted" style="font-size:12px">From ' + esc(x.name || x.email) + " · sent " + esc(ago(x.created_at)) + "</span></div>" + R.statusTag(d) + "</div>" +
+            R.shots(d.urls, 220) +
+            (d.note ? '<div><div class="eyebrow">THEIR QUESTION</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(d.note) + "</div></div>" : "") +
+            '<label class="field">' + (done ? "Your review (you can edit and send again)" : "Your review") + '<textarea class="input" data-rvtext="' + esc(x.id) + '" rows="5" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="What they did well, what to change, and what to focus on next time.">' + esc(RV.draft[x.id] != null ? RV.draft[x.id] : (d.reply || "")) + "</textarea></label>" +
+            '<div><button class="btn btn-metal" data-rvsend="' + esc(x.id) + '">' + (done ? "Update review" : "Send review") + "</button></div></section>";
+        }).join(""));
+  }
+  async function loadReviews(page) {
+    try { RV.rows = (await C().call("/admin/trade-reviews")).reviews || []; RV.msg = ""; }
+    catch (e) { RV.rows = []; RV.msg = "Couldn't load trade reviews: " + e.message; }
+    if (document.body.contains(page)) draw(page);
+  }
+  function wireReviews(page) {
+    if (S.tab === "reviews" && RV.rows === null && !RV.loading) { RV.loading = true; loadReviews(page).then(function () { RV.loading = false; }); }
+    $$("[data-rvf]", page).forEach(function (b) { b.onclick = function () { RV.filter = b.dataset.rvf; draw(page); }; });
+    $$("[data-rvtext]", page).forEach(function (t) { t.oninput = function () { RV.draft[t.dataset.rvtext] = t.value; }; });
+    $$("[data-rvsend]", page).forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.dataset.rvsend, txt = ($('[data-rvtext="' + id + '"]', page).value || "").trim();
+        if (!txt) { RV.msg = "Write the review first."; draw(page); return; }
+        b.disabled = true; b.textContent = "Sending…";
+        try {
+          var res = await C().call("/admin/trade-review", { id: id, reply: txt });
+          RV.rows.forEach(function (x) { if (String(x.id) === String(id)) x.data = res.data; });
+          delete RV.draft[id]; RV.msg = "Review sent. They can see it in their Trade Review page now.";
+        } catch (e) { RV.msg = "Couldn't send: " + e.message; }
+        draw(page);
+      };
+    });
+  }
   P.admin = async function (page) {
     page.innerHTML = head("Loading…");
     var A = C().AD;
+    if (RV.rows === null) C().call("/admin/trade-reviews").then(function (j) { RV.rows = j.reviews || []; if (document.body.contains(page) && S.tab !== "access") draw(page); }).catch(function () {});
     try { A.list = (await C().call("/admin/members")).members; A.msg = ""; }
     catch (e) { A.list = window.SDX_SAMPLE_MEMBERS || []; A.msg = window.SDX_SAMPLE_MEMBERS ? "" : "Couldn't load members: " + e.message; S.msg = A.msg; }
     draw(page);
