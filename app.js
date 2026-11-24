@@ -443,8 +443,13 @@
     });
     return { items: items, run: run, name: cfg[1], hasBt: !!((window.SDX_MECHBT || {})[pair] || []).length };
   }
+  function isOwner() {
+    var e = ((state.session && state.session.user && state.session.user.email) || "").toLowerCase();
+    return (C.OWNER_EMAILS || []).map(function (x) { return x.toLowerCase(); }).indexOf(e) > -1;
+  }
   function svcTabs() {
     var g = state.svcGroup || "ideas";
+    if (!isOwner()) return "";
     return '<div style="display:flex;flex-direction:column;gap:10px"><div class="tabs" style="flex-wrap:wrap"><button class="tab' + (g === "ideas" ? " on" : "") + '" data-svc="ideas">SDX Trade Ideas</button></div>' +
       '<div class="eyebrow">MECH MODEL</div><div class="tabs" style="flex-wrap:wrap">' +
       MECH.map(function (m) { return '<button class="tab' + (g === m[0] ? " on" : "") + '" data-svc="' + m[0] + '">' + m[1] + "</button>"; }).join("") +
@@ -520,6 +525,7 @@
   }
 
   function renderService(page) {
+    if (!isOwner()) state.svcGroup = "ideas";
     var grp = state.svcGroup || "ideas";
     if (grp !== "ideas") {
       if (!state.mech) { page.innerHTML = '<div class="note">Loading…</div>'; loadMech().then(function () { renderService(page); }); return; }
