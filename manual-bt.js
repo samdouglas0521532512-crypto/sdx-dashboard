@@ -93,7 +93,7 @@
 
     var html = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">ADMIN</div><h1 class="title">Manual <span class="metal-text">backtest.</span></h1>' +
       '<div class="note">Failed Break Mech Model. Every trade from the backtest, newest first. Check each one on the chart and tick Valid or Not valid.</div></div>';
-    if (M.err) html += '<div class="card pad note" style="color:#ff8a8a">Couldn\'t load your ticks: ' + esc(M.err) + "</div>";
+    if (M.err) html += '<div class="card pad note" style="color:var(--t-ff8a8a)">Couldn\'t load your ticks: ' + esc(M.err) + "</div>";
 
     html += '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">' +
       tabs("data-cp", M.pair, [["all", "All pairs"]].concat(PAIRS.map(function (p) { return [p, p]; }))) +
@@ -108,11 +108,11 @@
 
     var pager = rows.length > PER ? '<div style="display:flex;gap:10px;align-items:center;justify-content:center;padding:12px"><button class="tab" data-pg="-1"' + (M.pg === 0 ? " disabled" : "") + '>Newer</button><span class="muted" style="font-size:12px">Page ' + (M.pg + 1) + " of " + pages + " (" + rows.length.toLocaleString("en-GB") + ' trades)</span><button class="tab" data-pg="1"' + (M.pg >= pages - 1 ? " disabled" : "") + ">Older</button></div>" : "";
     html += '<section class="card"><div style="display:flex;justify-content:flex-end;padding:10px 14px 0"><span class="muted" id="ckMsg" style="font-size:12px">' + esc(M.saveMsg) + "</span></div>" + pager +
-      '<div class="scroll-x"><table style="min-width:1080px"><thead><tr style="background:#0c0c0d"><th>Date (UK)</th><th>Pair</th><th>TF</th><th>Side</th><th>Entry</th><th>SL</th><th>TP</th><th>Result</th><th>R</th><th style="text-align:center">Valid</th><th style="text-align:center">Not valid</th></tr></thead><tbody>' +
+      '<div class="scroll-x"><table style="min-width:1080px"><thead><tr style="background:var(--t-0c0c0d)"><th>Date (UK)</th><th>Pair</th><th>TF</th><th>Side</th><th>Entry</th><th>SL</th><th>TP</th><th>Result</th><th>R</th><th style="text-align:center">Valid</th><th style="text-align:center">Not valid</th></tr></thead><tbody>' +
       slice.map(function (t) {
         var d = new Date(t.t * 60000), c = chk(t);
-        var box = function (v) { return '<td style="text-align:center"><input type="checkbox" data-ck="' + t.pair + "|" + t.key + '" data-v="' + v + '"' + (c === v ? " checked" : "") + ' style="width:18px;height:18px;cursor:pointer;accent-color:' + (v === "v" ? "#7fd99a" : "#ff8a8a") + '"></td>'; };
-        return "<tr" + (c === "v" ? ' style="background:#0f1a12"' : c === "x" ? ' style="background:#1a0f0f"' : "") + "><td>" +
+        var box = function (v) { return '<td style="text-align:center"><input type="checkbox" data-ck="' + t.pair + "|" + t.key + '" data-v="' + v + '"' + (c === v ? " checked" : "") + ' style="width:18px;height:18px;cursor:pointer;accent-color:' + (v === "v" ? "var(--t-7fd99a)" : "var(--t-ff8a8a)") + '"></td>'; };
+        return "<tr" + (c === "v" ? ' style="background:var(--t-0f1a12)"' : c === "x" ? ' style="background:var(--t-1a0f0f)"' : "") + "><td>" +
           esc(d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" })) + ' <span class="muted">' + esc(d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })) + "</span></td>" +
           "<td><b>" + t.pair + "</b></td><td>" + esc(t.tf) + "</td><td>" + t.side + "</td><td>" + px(t, t.e) + "</td>" +
           "<td>" + px(t, t.sl) + ' <span class="muted">(' + pips(t, t.e, t.sl) + ")</span></td><td>" + px(t, t.tp) + ' <span class="muted">(' + pips(t, t.tp, t.e) + ")</span></td>" +

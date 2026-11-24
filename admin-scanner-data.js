@@ -101,11 +101,11 @@
     var v = curVer(key); if (!v || !v.stage) return "";
     var latest = v.stage !== "older";
     var top = versions(key).filter(function (x) { return x.stage === "latest"; })[0];
-    if (v.noTrade) return '<div style="border:1px solid var(--neg, #FF4D4D);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45"><b style="color:var(--neg, #FF4D4D)">NOT TRADED ON THIS PAIR.</b> This is the most refined test, but nothing held up in the latest year, so the model isn\'t used here.</div>';
+    if (v.noTrade) return '<div style="border:1px solid var(--neg, var(--t-ff4d4d));border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45"><b style="color:var(--neg, var(--t-ff4d4d))">NOT TRADED ON THIS PAIR.</b> This is the most refined test, but nothing held up in the latest year, so the model isn\'t used here.</div>';
     var msg = latest
       ? (v.stage === "latest" ? "LATEST · MOST REFINED. This is the version to use. All the refinements so far are built in." : "LATEST · MOST REFINED (one part of it). Part of " + (top ? top.name : "the latest version") + ".")
       : "BEFORE REFINEMENT. These rules were valid at the time and the results are real backtests, but they've since been refined. For trading, use " + (top ? top.name : "the latest version") + ".";
-    var col = latest ? "var(--pos, #16C35A)" : "var(--warn, #E0A100)";
+    var col = latest ? "var(--pos, var(--t-16c35a))" : "var(--warn, #E0A100)";
     return '<div style="border:1px solid ' + col + ';border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45"><b style="color:' + col + '">' + esc(msg.split(".")[0]) + ".</b>" + esc(msg.slice(msg.indexOf(".") + 1)) + "</div>";
   }
 
@@ -123,7 +123,7 @@
     return '<div class="scroll-x"><table style="min-width:' + (full ? 820 : 520) + 'px"><thead><tr>' + hd + "</tr></thead><tbody>" +
       rows.map(function (x) {
         var L = x.L, on = x.v.id === cur, top = L.length && x.R === best;
-        return '<tr style="' + (on ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x.v.name) + (S.tp ? (hasMax(x.v) ? ' <span class="muted" style="font-size:11px">· TP ' + S.tp + "R</span>" : ' <span class="muted" style="font-size:11px">· TP as tested</span>') : "") + (top ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") + (on ? ' <span class="muted" style="font-size:11px">· showing</span>' : "") + "</td>" +
+        return '<tr style="' + (on ? "background:rgba(var(--r-233-237-242),.06)" : "") + '"><td>' + esc(x.v.name) + (S.tp ? (hasMax(x.v) ? ' <span class="muted" style="font-size:11px">· TP ' + S.tp + "R</span>" : ' <span class="muted" style="font-size:11px">· TP as tested</span>') : "") + (top ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") + (on ? ' <span class="muted" style="font-size:11px">· showing</span>' : "") + "</td>" +
           '<td class="r">' + L.length + '</td><td class="r muted">' + count(L, "TP") + " / " + count(L, "BE") + " / " + count(L, "SL") + '</td><td class="r">' + wr(L) + '</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (L.length ? rTxt(x.R) : "—") + '</td><td class="r ' + cls(net(L)) + '" style="font-weight:600">' + (L.length && net(L) != null ? rTxt(net(L)) : "—") + '</td><td class="r ' + cls(pips(L)) + '">' + (L.length && pips(L) != null ? pTxt(pips(L)) : "—") + "</td>" +
           (full ? '<td class="r neg">' + rTxt(drawdown(L)) + '</td><td class="r">' + loseRun(L) + '</td><td class="r">' + posMonths(L) + "</td>" : "") + "</tr>";
       }).join("") + "</tbody></table></div>";
@@ -159,7 +159,7 @@
           if (!c) return '<td class="r muted">—</td>';
           var main = o.k === "R" ? '<span class="' + cls(c.R) + '" style="font-weight:600">' + rTxt(c.R) + "</span>" : o.k === "wr" ? c.wr + "%" : '<span class="neg">' + rTxt(c.dd) + "</span>";
           var top = c.R === best;
-          return '<td class="r" style="' + (top ? "box-shadow:inset 0 0 0 1px rgba(127,217,154,.6)" : "") + '" title="' + c.q.n + " trades · " + c.q.W + "W " + c.q.BE + "RF " + c.q.L + "L · win rate " + c.wr + "% · " + rTxt(c.R) + " · drawdown " + rTxt(c.dd) + '">' + main + "</td>";
+          return '<td class="r" style="' + (top ? "box-shadow:inset 0 0 0 1px rgba(var(--r-127-217-154),.6)" : "") + '" title="' + c.q.n + " trades · " + c.q.W + "W " + c.q.BE + "RF " + c.q.L + "L · win rate " + c.wr + "% · " + rTxt(c.R) + " · drawdown " + rTxt(c.dd) + '">' + main + "</td>";
         }).join("") + "</tr>";
       }).join("") + "</tbody></table></div>";
     return '<span class="eyebrow" style="margin-top:6px">SL SIZE TEST · ' + (per === "all" ? "ALL YEARS" : per) + "</span>" +
@@ -178,7 +178,7 @@
       '<div class="chips">' + chip("R", "Most R after spread") + chip("pips", "Most pips") + chip("win", P.wl ? "Highest win rate" : "Most trades in profit") + chip("dd", "Smallest drawdown") + "</div>" +
       '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Plan</th><th class="r">Total R</th><th class="r">After spread</th><th class="r">Pips</th><th class="r">' + (P.wl ? "Win rate (W vs L)" : "In profit") + '</th><th class="r">Drawdown</th><th class="r">Losing run</th><th class="r">2022-24 after spread</th><th class="r">2025-26 after spread</th></tr></thead><tbody>' +
       rows.map(function (x) {
-        return '<tr style="' + (x[9] ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x[0]) + (x[9] ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + '</td><td class="r ' + cls(x[1]) + '">' + rTxt(x[1]) +
+        return '<tr style="' + (x[9] ? "background:rgba(var(--r-233-237-242),.06)" : "") + '"><td>' + esc(x[0]) + (x[9] ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + '</td><td class="r ' + cls(x[1]) + '">' + rTxt(x[1]) +
           '</td><td class="r ' + cls(x[2]) + '" style="font-weight:600">' + rTxt(x[2]) + '</td><td class="r ' + cls(x[3]) + '">' + pTxt(x[3]) + '</td><td class="r">' + x[4] + '%</td><td class="r neg">' + rTxt(x[5]) +
           '</td><td class="r">' + x[6] + '</td><td class="r ' + cls(x[7]) + '">' + rTxt(x[7]) + '</td><td class="r ' + cls(x[8]) + '">' + rTxt(x[8]) + "</td></tr>";
       }).join("") + "</tbody></table></div>";
@@ -203,7 +203,7 @@
           if (!q || !q.n) return '<td class="r muted">—</td>';
           var w = q.W + q.L ? Math.round((q.W / (q.W + q.L)) * 1000) / 10 : 0;
           var main = o.k === "R" ? '<span class="' + cls(q.R) + '" style="font-weight:600">' + rTxt(q.R) + "</span>" : o.k === "wr" ? w + "%" : '<span class="neg">' + rTxt(q.dd) + "</span>";
-          return '<td class="r" style="' + (q.R === best ? "box-shadow:inset 0 0 0 1px rgba(127,217,154,.6)" : "") + '" title="' + q.n + " trades · " + q.W + "W " + q.L + "L · win rate " + w + "% · " + rTxt(q.R) + " after spread · drawdown " + rTxt(q.dd) + '">' + main + "</td>";
+          return '<td class="r" style="' + (q.R === best ? "box-shadow:inset 0 0 0 1px rgba(var(--r-127-217-154),.6)" : "") + '" title="' + q.n + " trades · " + q.W + "W " + q.L + "L · win rate " + w + "% · " + rTxt(q.R) + " after spread · drawdown " + rTxt(q.dd) + '">' + main + "</td>";
         }).join("") + "</tr>";
       }).join("") + "</tbody></table></div>";
     return '<span class="eyebrow">SL SIZE AND TP TEST · ' + (per === "all" ? "ALL YEARS" : per) + "</span>" +
@@ -248,7 +248,7 @@
     return '<div class="scroll-x"><table style="min-width:900px"><thead><tr><th>Option</th><th class="r">Trades</th><th class="r">Win rate (W vs L)</th><th class="r">Stopped at entry</th><th class="r">Total R</th><th class="r">Drawdown</th><th class="r">Losing run</th>' +
       OVY.map(function (y) { return '<th class="r">' + y + "</th>"; }).join("") + "</tr></thead><tbody>" +
       rows.map(function (x) {
-        return '<tr style="' + (x.cur ? "background:rgba(233,237,242,.06)" : "") + '"><td>' + esc(x.label) + (x.cur ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + (x.best ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") +
+        return '<tr style="' + (x.cur ? "background:rgba(var(--r-233-237-242),.06)" : "") + '"><td>' + esc(x.label) + (x.cur ? ' <span class="tag" style="margin-left:6px">In use</span>' : "") + (x.best ? ' <span class="tag" style="margin-left:6px">Best</span>' : "") +
           '</td><td class="r">' + x.n + '</td><td class="r">' + ovWr(x) + '</td><td class="r muted">' + x.rf + '%</td><td class="r ' + cls(x.R) + '" style="font-weight:600">' + (x.n ? rTxt(x.R) : "—") +
           '</td><td class="r neg">' + rTxt(x.dd) + '</td><td class="r">' + x.run + "</td>" +
           x.years.map(function (v) { return '<td class="r ' + cls(v) + '">' + (v == null ? "—" : rTxt(v)) + "</td>"; }).join("") + "</tr>";
@@ -297,8 +297,8 @@
       tile("Win rate (W vs L)", w + l ? (Math.round(1000 * w / (w + l)) / 10) + "%" : "—") + tile("Profitable months", up + " of " + had) + "</div>";
     var boxes = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' + ms.map(function (m, i) {
       if (!m) return '<div style="border:1px dashed var(--line, #C9CED5);border-radius:12px;padding:12px;min-height:96px;opacity:.55"><div style="font:700 13px var(--sg)">' + MON[i] + '</div><div class="note" style="font-size:12px;margin-top:6px">No trades / no data</div></div>';
-      var bg = m.R > 0 ? "rgba(22,195,90,.14)" : m.R < 0 ? "rgba(255,77,77,.14)" : "rgba(140,146,156,.16)";
-      var bd = m.R > 0 ? "#16C35A" : m.R < 0 ? "#FF4D4D" : "#8C929C";
+      var bg = m.R > 0 ? "rgba(var(--r-22-195-90),.14)" : m.R < 0 ? "rgba(var(--r-255-77-77),.14)" : "rgba(140,146,156,.16)";
+      var bd = m.R > 0 ? "var(--t-16c35a)" : m.R < 0 ? "var(--t-ff4d4d)" : "var(--t-8c929c)";
       return '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:12px;padding:12px;min-height:96px;display:flex;flex-direction:column;gap:4px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 13px var(--sg)">' + MON[i] + '</span><span class="note" style="font-size:11px">' + m.n + " trades</span></div>" +
         '<div style="font:700 22px var(--sg);color:' + bd + '">' + rTxt(m.R) + "</div>" +
@@ -309,8 +309,8 @@
     if (S.calAll) {
       var cell = function (m) {
         if (!m) return '<td class="r" style="opacity:.45">—</td>';
-        var bg = m.R > 0 ? "rgba(22,195,90,.16)" : m.R < 0 ? "rgba(255,77,77,.16)" : "rgba(140,146,156,.18)";
-        var fg = m.R > 0 ? "#16C35A" : m.R < 0 ? "#FF4D4D" : "#8C929C";
+        var bg = m.R > 0 ? "rgba(var(--r-22-195-90),.16)" : m.R < 0 ? "rgba(var(--r-255-77-77),.16)" : "rgba(140,146,156,.18)";
+        var fg = m.R > 0 ? "var(--t-16c35a)" : m.R < 0 ? "var(--t-ff4d4d)" : "var(--t-8c929c)";
         return '<td class="r" style="background:' + bg + ';white-space:nowrap"><div style="font-weight:700;color:' + fg + '">' + rTxt(m.R) + '</div><div class="note" style="font-size:10.5px">' + m.n + " tr</div></td>";
       };
       var grand = 0, gn = 0, gw = 0, gl = 0;
@@ -360,10 +360,10 @@
     var y = S.year, L = allTrades(y);
     var cells = MONTHS.map(function (name, m) {
       var T = allTrades(y, m), x = sumR(T);
-      if (!T.length) return '<div class="jday off sdm-m" style="min-height:96px;box-shadow:inset 0 0 0 1px #18191b"><span class="dn" style="font-size:12px">' + name + '</span><span class="muted" style="font-size:12px">No trades</span></div>';
+      if (!T.length) return '<div class="jday off sdm-m" style="min-height:96px;box-shadow:inset 0 0 0 1px var(--t-18191b)"><span class="dn" style="font-size:12px">' + name + '</span><span class="muted" style="font-size:12px">No trades</span></div>';
       var p = pips(T);
       return '<button class="jday sdm-m ' + (x > 0 ? "up" : x < 0 ? "down" : "flat") + '" data-sdm="' + m + '" style="min-height:96px;cursor:pointer;border:0;text-align:left;color:inherit">' +
-        '<span class="dn" style="font-size:12px;color:#c9ccd1">' + name + "</span>" +
+        '<span class="dn" style="font-size:12px;color:var(--t-c9ccd1)">' + name + "</span>" +
         '<span class="dr" style="font-size:22px">' + rTxt(x) + "</span>" +
         '<span class="dn">' + T.length + " trades · " + count(T, "TP") + "W " + count(T, "BE") + "RF " + count(T, "SL") + "L" + (p != null ? " · " + pTxt(p) : "") + "</span></button>";
     }).join("");
@@ -412,7 +412,7 @@
     var first = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7; // Monday first
     var n = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(), byDay = {};
     T.forEach(function (t) { var d = +t[0].slice(8, 10); byDay[d] = (byDay[d] || 0) + r(t); });
-    var html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(function (d) { return '<div class="dn" style="font-size:10px;color:#6b7078;text-align:center">' + d + "</div>"; }).join("");
+    var html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(function (d) { return '<div class="dn" style="font-size:10px;color:var(--t-6b7078);text-align:center">' + d + "</div>"; }).join("");
     for (var i = 0; i < first; i++) html += '<div class="jday off"></div>';
     for (var d = 1; d <= n; d++) {
       var x = byDay[d] != null ? Math.round(byDay[d] * 10) / 10 : null;

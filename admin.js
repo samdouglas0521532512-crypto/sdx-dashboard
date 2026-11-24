@@ -27,10 +27,10 @@
   function tile(k, v, cls) { return '<div class="tile"><span class="k">' + esc(k) + '</span><span class="v ' + (cls || "") + '">' + esc(v) + "</span></div>"; }
   function planTag(p) {
     var elite = p === "Elite Pack";
-    return '<span class="tag" style="' + (elite ? "background:var(--metal);color:#0a0a0a" : "background:#1c1c1e;color:#c9ced6") + '">' + esc(elite ? "ELITE" : p === "Trade Service" ? "FREE" : (p || "").toUpperCase()) + "</span>";
+    return '<span class="tag" style="' + (elite ? "background:var(--metal);color:#0a0a0a" : "background:var(--t-1c1c1e);color:var(--t-c9ced6)") + '">' + esc(elite ? "ELITE" : p === "Trade Service" ? "FREE" : (p || "").toUpperCase()) + "</span>";
   }
   function reqTag(st) {
-    var c = st === "added" ? ["ACCESS GRANTED", "rgba(127,217,154,.14)", "#7fd99a"] : st === "removed" ? ["REMOVED", "rgba(255,138,138,.12)", "#ff8a8a"] : ["WAITING", "rgba(255,159,67,.14)", "#ffb26b"];
+    var c = st === "added" ? ["ACCESS GRANTED", "rgba(var(--r-127-217-154),.14)", "var(--t-7fd99a)"] : st === "removed" ? ["REMOVED", "rgba(var(--r-255-138-138),.12)", "var(--t-ff8a8a)"] : ["WAITING", "rgba(var(--r-255-159-67),.14)", "var(--t-ffb26b)"];
     return '<span class="tag" style="background:' + c[1] + ";color:" + c[2] + '">' + c[0] + "</span>";
   }
   function allReqs() {
@@ -42,7 +42,7 @@
     var r = m.scanner_requests || [];
     if (!r.length) return '<span class="muted">—</span>';
     var w = r.filter(function (x) { return x.status === "requested"; }).length, g = r.filter(function (x) { return x.status === "added"; }).length;
-    return (g ? '<span style="color:#7fd99a">' + g + " granted</span>" : "") + (g && w ? " · " : "") + (w ? '<span style="color:#ffb26b">' + w + " waiting</span>" : "") + (!g && !w ? '<span class="muted">Removed</span>' : "");
+    return (g ? '<span style="color:var(--t-7fd99a)">' + g + " granted</span>" : "") + (g && w ? " · " : "") + (w ? '<span style="color:var(--t-ffb26b)">' + w + " waiting</span>" : "") + (!g && !w ? '<span class="muted">Removed</span>' : "");
   }
 
   // ---------- tabs (shared with the Access tab in pages.js) ----------
@@ -69,10 +69,10 @@
     var recent = L.filter(function (m) { return m.last_activity; }).sort(function (a, b) { return b.last_activity > a.last_activity ? 1 : -1; }).slice(0, 8);
     var newest = L.slice().sort(function (a, b) { return (b.created_at || "") > (a.created_at || "") ? 1 : -1; }).slice(0, 6);
     function row(m, right) {
-      return '<button data-open="' + esc(m.email) + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:11px 0;border:none;border-bottom:1px solid #18181a;background:none;color:#f4f4f5;font:13px Inter;cursor:pointer;text-align:left"><span style="display:flex;gap:10px;align-items:center;min-width:0"><span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.name || m.email) + "</span>" + planTag(m.plan) + '</span><span class="muted" style="font-size:12px;white-space:nowrap">' + right + "</span></button>";
+      return '<button data-open="' + esc(m.email) + '" style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:11px 0;border:none;border-bottom:1px solid var(--t-18181a);background:none;color:var(--t-f4f4f5);font:13px Inter;cursor:pointer;text-align:left"><span style="display:flex;gap:10px;align-items:center;min-width:0"><span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.name || m.email) + "</span>" + planTag(m.plan) + '</span><span class="muted" style="font-size:12px;white-space:nowrap">' + right + "</span></button>";
     }
     function card(title, inner, empty) { return '<section class="card pad" style="display:flex;flex-direction:column"><span class="eyebrow" style="margin-bottom:6px">' + esc(title) + "</span>" + (inner || '<div class="note" style="padding:14px 0">' + esc(empty) + "</div>") + "</section>"; }
-    return '<div class="tiles" style="padding:6px 0;border-bottom:1px solid #18181a">' +
+    return '<div class="tiles" style="padding:6px 0;border-bottom:1px solid var(--t-18181a)">' +
       tile("Students", active.length) + tile("Elite", elite) + tile("Free", free) + tile("Active this week", a7, "pos") +
       tile("Scanner requests", pend.length, pend.length ? "neg" : "") + tile("Signals logged", sum("signals_logged")) + tile("Journal trades", sum("trades")) + "</div>" +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">' +
@@ -103,9 +103,9 @@
     return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input class="input" id="aQ" placeholder="Search name, email or Telegram" value="' + esc(S.q) + '" style="max-width:300px;height:38px" autocomplete="off">' +
       '<div class="chips">' + [["all", "All"], ["elite", "Elite"], ["free", "Free"], ["quiet", "Quiet 7+ days"], ["revoked", "Revoked"]].map(function (f) { return '<button class="chip' + (S.plan === f[0] ? " on" : "") + '" data-ap="' + f[0] + '">' + f[1] + "</button>"; }).join("") + "</div>" +
       '<select class="input" id="aSort" style="height:38px;width:auto;font-size:13px">' + [["active", "Last active"], ["joined", "Newest"], ["trades", "Most trades"], ["journal", "Most journal use"]].map(function (o) { return '<option value="' + o[0] + '"' + (S.sort === o[0] ? " selected" : "") + ">Sort: " + o[1] + "</option>"; }).join("") + "</select></div>" +
-      '<section class="card"><div class="scroll-x"><table style="min-width:1100px"><thead><tr style="background:#0c0c0d"><th>Student</th><th>Plan</th><th>Last login</th><th>Last active</th><th class="r">Journal</th><th class="r">Trades</th><th class="r">Win rate</th><th class="r">Total R</th><th class="r">Signals</th><th class="r">Videos</th><th>Scanners</th></tr></thead><tbody>' +
+      '<section class="card"><div class="scroll-x"><table style="min-width:1100px"><thead><tr style="background:var(--t-0c0c0d)"><th>Student</th><th>Plan</th><th>Last login</th><th>Last active</th><th class="r">Journal</th><th class="r">Trades</th><th class="r">Win rate</th><th class="r">Total R</th><th class="r">Signals</th><th class="r">Videos</th><th>Scanners</th></tr></thead><tbody>' +
       L.map(function (m) {
-        return '<tr data-open="' + esc(m.email) + '" style="cursor:pointer' + (m.active ? "" : ";opacity:.5") + '"><td><div style="font-weight:600">' + esc(m.name || m.email) + '</div><div class="muted" style="font-size:11px">' + esc(m.telegram_username ? "@" + m.telegram_username : m.email) + "</div></td><td>" + planTag(m.plan) + '</td><td class="muted">' + ago(m.last_sign_in) + '</td><td class="muted">' + ago(m.last_activity) + '</td><td class="r">' + (m.journal_entries || 0) + '</td><td class="r">' + (m.trades || 0) + '</td><td class="r">' + winRate(m) + '</td><td class="r" style="color:' + ((m.total_r || 0) > 0 ? "#7fd99a" : (m.total_r || 0) < 0 ? "#ff8a8a" : "inherit") + '">' + (m.trades ? rTxt(m.total_r) : "—") + '</td><td class="r">' + (m.signals_logged || 0) + '</td><td class="r">' + (m.videos_watched || 0) + "</td><td>" + scannerStatus(m) + "</td></tr>";
+        return '<tr data-open="' + esc(m.email) + '" style="cursor:pointer' + (m.active ? "" : ";opacity:.5") + '"><td><div style="font-weight:600">' + esc(m.name || m.email) + '</div><div class="muted" style="font-size:11px">' + esc(m.telegram_username ? "@" + m.telegram_username : m.email) + "</div></td><td>" + planTag(m.plan) + '</td><td class="muted">' + ago(m.last_sign_in) + '</td><td class="muted">' + ago(m.last_activity) + '</td><td class="r">' + (m.journal_entries || 0) + '</td><td class="r">' + (m.trades || 0) + '</td><td class="r">' + winRate(m) + '</td><td class="r" style="color:' + ((m.total_r || 0) > 0 ? "var(--t-7fd99a)" : (m.total_r || 0) < 0 ? "var(--t-ff8a8a)" : "inherit") + '">' + (m.trades ? rTxt(m.total_r) : "—") + '</td><td class="r">' + (m.signals_logged || 0) + '</td><td class="r">' + (m.videos_watched || 0) + "</td><td>" + scannerStatus(m) + "</td></tr>";
       }).join("") + "</tbody></table></div>" + (L.length ? "" : '<div class="note" style="padding:30px;text-align:center">No students match.</div>') + "</section>";
   }
 
@@ -115,11 +115,11 @@
     var n = function (s) { return R.filter(function (r) { return r.status === s; }).length; };
     return '<div class="note" style="font-size:13px;max-width:760px">To give access: tap Copy, open the scanner on TradingView, go to Manage access, paste the username and add them. Then tap Mark granted here. Marking someone removed here does not take them off TradingView, so remove them in Manage access too.</div>' +
       '<div class="chips">' + [["requested", "Waiting (" + n("requested") + ")"], ["added", "Granted (" + n("added") + ")"], ["removed", "Removed (" + n("removed") + ")"], ["all", "All (" + R.length + ")"]].map(function (f) { return '<button class="chip' + (S.reqFilter === f[0] ? " on" : "") + '" data-rf="' + f[0] + '">' + f[1] + "</button>"; }).join("") + "</div>" +
-      '<section class="card"><div class="scroll-x"><table style="min-width:900px"><thead><tr style="background:#0c0c0d"><th>Student</th><th>Plan</th><th>Scanner</th><th>TradingView username</th><th>Requested</th><th>Status</th><th class="r">Action</th></tr></thead><tbody>' +
+      '<section class="card"><div class="scroll-x"><table style="min-width:900px"><thead><tr style="background:var(--t-0c0c0d)"><th>Student</th><th>Plan</th><th>Scanner</th><th>TradingView username</th><th>Requested</th><th>Status</th><th class="r">Action</th></tr></thead><tbody>' +
       shown.map(function (r) {
         var btns = r.status === "added"
-          ? '<button class="chip" data-rq="' + esc(r.id) + '" data-st="removed" style="min-height:32px;color:#ff8a8a;border-color:rgba(255,138,138,.4)">Mark removed</button>'
-          : '<button class="chip" data-rq="' + esc(r.id) + '" data-st="added" style="min-height:32px;color:#7fd99a;border-color:rgba(127,217,154,.4)">Mark granted</button>';
+          ? '<button class="chip" data-rq="' + esc(r.id) + '" data-st="removed" style="min-height:32px;color:var(--t-ff8a8a);border-color:rgba(var(--r-255-138-138),.4)">Mark removed</button>'
+          : '<button class="chip" data-rq="' + esc(r.id) + '" data-st="added" style="min-height:32px;color:var(--t-7fd99a);border-color:rgba(var(--r-127-217-154),.4)">Mark granted</button>';
         return '<tr><td style="font-weight:600">' + esc(r.member.name || r.member.email) + "</td><td>" + planTag(r.member.plan) + "</td><td>" + esc(SCAN_NAMES[r.scanner] || r.name || "") + '</td><td><span style="font-family:var(--sg);font-weight:600">@' + esc(r.tv) + '</span> <button class="chip" data-copy="' + esc(r.tv) + '" style="min-height:26px;font-size:11px;margin-left:6px">Copy</button></td><td class="muted">' + ago(r.at) + "</td><td>" + reqTag(r.status) + '</td><td class="r">' + btns + "</td></tr>";
       }).join("") + "</tbody></table></div>" + (shown.length ? "" : '<div class="note" style="padding:30px;text-align:center">Nothing here.</div>') + "</section>";
   }
@@ -153,11 +153,11 @@
       '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label class="btn btn-ghost" style="cursor:pointer">Upload Kajabi CSV<input type="file" id="imFile" accept=".csv,.txt,text/csv" style="display:none"></label><span class="muted" style="font-size:12px">or paste below</span></div>' +
       '<textarea class="input" id="imText" rows="9" placeholder="jordan@gmail.com&#10;kai@hotmail.co.uk" style="font-family:ui-monospace,monospace;font-size:12px;padding:12px;height:auto">' + esc(IM.text) + "</textarea>" +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span class="muted" style="font-size:13px" id="imCount">' + P2.length + " email" + (P2.length === 1 ? "" : "s") + ' found</span><button class="btn btn-metal" id="imGo"' + (P2.length && !IM.busy ? "" : " disabled") + ">" + (IM.busy ? "Adding…" : "Give Elite access") + "</button></div>" +
-      (R ? '<div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #18181a;padding-top:14px;font-size:13px">' + (R.err ? '<div style="color:#ff8a8a">' + esc(R.err) + "</div>" :
-        '<div style="color:#7fd99a">' + R.added.length + " added with Elite access.</div>" +
+      (R ? '<div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--t-18181a);padding-top:14px;font-size:13px">' + (R.err ? '<div style="color:var(--t-ff8a8a)">' + esc(R.err) + "</div>" :
+        '<div style="color:var(--t-7fd99a)">' + R.added.length + " added with Elite access.</div>" +
         (R.already.length ? '<div class="muted">' + R.already.length + " already had access.</div>" : "") +
-        (R.revoked.length ? '<div style="color:#ffb26b">' + R.revoked.length + " were revoked before, so left revoked: " + esc(R.revoked.join(", ")) + ". Restore them on the Access tab if you want them back.</div>" : "") +
-        (R.bad.length ? '<div style="color:#ff8a8a">' + R.bad.length + " didn't look like emails: " + esc(R.bad.join(", ")) + "</div>" : "")) + "</div>" : "") +
+        (R.revoked.length ? '<div style="color:var(--t-ffb26b)">' + R.revoked.length + " were revoked before, so left revoked: " + esc(R.revoked.join(", ")) + ". Restore them on the Access tab if you want them back.</div>" : "") +
+        (R.bad.length ? '<div style="color:var(--t-ff8a8a)">' + R.bad.length + " didn't look like emails: " + esc(R.bad.join(", ")) + "</div>" : "")) + "</div>" : "") +
       "</section>";
   }
   function wireImport(page) {
@@ -183,8 +183,8 @@
     else if (D.err) body = '<div class="note">' + esc(D.err) + "</div>";
     else {
       var done = {}; (D.videos || []).forEach(function (v) { if (v.done) done[v.file] = true; });
-      body = '<div><span class="eyebrow">RECENT TRADES</span>' + (D.trades && D.trades.length ? '<div class="scroll-x"><table style="min-width:440px;margin-top:6px"><thead><tr><th>Date</th><th>Pair</th><th>Side</th><th>Setup</th><th class="r">R</th></tr></thead><tbody>' + D.trades.slice(0, 12).map(function (t) { return '<tr><td class="muted">' + dmy(t.date) + "</td><td>" + esc(t.pair || "—") + "</td><td>" + esc((t.side || "—").toString().toUpperCase()) + '</td><td class="muted">' + esc(t.setup || "") + '</td><td class="r" style="color:' + (t.r > 0 ? "#7fd99a" : t.r < 0 ? "#ff8a8a" : "inherit") + '">' + (t.r != null ? rTxt(t.r) : "—") + "</td></tr>"; }).join("") + "</tbody></table></div>" : '<div class="note" style="padding:8px 0">No trades logged yet.</div>') + "</div>" +
-        '<div><span class="eyebrow">VIDEOS</span><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' + (vids.length ? vids.filter(function (v) { return v[2]; }).map(function (v) { return '<div style="display:flex;justify-content:space-between;font-size:13px"><span>' + esc(v[0]) + '</span><span style="color:' + (done[v[2]] ? "#7fd99a" : "#6b7078") + '">' + (done[v[2]] ? "Watched" : "Not yet") + "</span></div>"; }).join("") : '<div class="note">No videos.</div>') + "</div></div>" +
+      body = '<div><span class="eyebrow">RECENT TRADES</span>' + (D.trades && D.trades.length ? '<div class="scroll-x"><table style="min-width:440px;margin-top:6px"><thead><tr><th>Date</th><th>Pair</th><th>Side</th><th>Setup</th><th class="r">R</th></tr></thead><tbody>' + D.trades.slice(0, 12).map(function (t) { return '<tr><td class="muted">' + dmy(t.date) + "</td><td>" + esc(t.pair || "—") + "</td><td>" + esc((t.side || "—").toString().toUpperCase()) + '</td><td class="muted">' + esc(t.setup || "") + '</td><td class="r" style="color:' + (t.r > 0 ? "var(--t-7fd99a)" : t.r < 0 ? "var(--t-ff8a8a)" : "inherit") + '">' + (t.r != null ? rTxt(t.r) : "—") + "</td></tr>"; }).join("") + "</tbody></table></div>" : '<div class="note" style="padding:8px 0">No trades logged yet.</div>') + "</div>" +
+        '<div><span class="eyebrow">VIDEOS</span><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' + (vids.length ? vids.filter(function (v) { return v[2]; }).map(function (v) { return '<div style="display:flex;justify-content:space-between;font-size:13px"><span>' + esc(v[0]) + '</span><span style="color:' + (done[v[2]] ? "var(--t-7fd99a)" : "var(--t-6b7078)") + '">' + (done[v[2]] ? "Watched" : "Not yet") + "</span></div>"; }).join("") : '<div class="note">No videos.</div>') + "</div></div>" +
         '<div><span class="eyebrow">SCANNERS</span><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' + ((m.scanner_requests || []).length ? m.scanner_requests.map(function (r) { return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px"><span>' + esc(SCAN_NAMES[r.scanner] || r.name || "") + ' <span class="muted">@' + esc(r.tv) + "</span></span>" + reqTag(r.status) + "</div>"; }).join("") : '<div class="note">No scanner requests.</div>') + "</div></div>";
     }
     return '<div class="modal-wrap" id="aWrap"><section class="modal" style="max-width:640px;max-height:88vh;overflow:auto;display:flex;flex-direction:column;gap:18px">' +

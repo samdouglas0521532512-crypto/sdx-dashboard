@@ -53,20 +53,20 @@
   // ---------- page ----------
   function tile(k, v, c) { return '<div class="tile"><span class="k">' + k + '</span><span class="v ' + (c || "") + '">' + esc(String(v)) + "</span></div>"; }
   function sel(f, opts, v, ph) { return '<select class="input" data-f="' + f + '" style="height:36px;padding:0 8px;width:auto;font-size:13px">' + (ph ? '<option value="">' + ph + "</option>" : "") + opts.map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select>"; }
-  function lab(t, inner) { return '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#7c8088;text-transform:uppercase;letter-spacing:.04em">' + t + inner + "</label>"; }
+  function lab(t, inner) { return '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--t-7c8088);text-transform:uppercase;letter-spacing:.04em">' + t + inner + "</label>"; }
 
   function tradeRow(x) {
     var d = x.data, r = tradeR(d);
     var resBtn = function (v, c) { var on = d.result === v; return '<button class="tab' + (on ? " on" : "") + '" data-res="' + v + '" style="height:30px;padding:0 10px;font-size:12px' + (on ? ";color:" + c : "") + '">' + v + "</button>"; };
-    return '<div class="fbj-t" data-id="' + x.id + '" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:10px 12px;border-radius:10px;background:#0a0a0b;box-shadow:inset 0 0 0 1px ' + (d.result === "Win" ? "#1f4a2c" : d.result === "Loss" ? "#4a1f1f" : "#1a1a1c") + '">' +
+    return '<div class="fbj-t" data-id="' + x.id + '" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:10px 12px;border-radius:10px;background:var(--t-0a0a0b);box-shadow:inset 0 0 0 1px ' + (d.result === "Win" ? "var(--t-1f4a2c)" : d.result === "Loss" ? "var(--t-4a1f1f)" : "var(--t-1a1a1c)") + '">' +
       lab("TF", sel("tf", TFS, d.tf)) +
       lab("Side", sel("side", ["Buy", "Sell"], d.side, "–")) +
       lab("Entry", '<input class="input" type="time" data-f="entry_t" value="' + esc(d.entry_t || "") + '" style="height:36px;padding:0 8px;width:110px;font-size:13px">') +
       lab("Exit", '<input class="input" type="time" data-f="exit_t" value="' + esc(d.exit_t || "") + '" style="height:36px;padding:0 8px;width:110px;font-size:13px">') +
       lab("TP (R)", '<input class="input" type="number" step="0.1" data-f="tp_r" value="' + esc(d.tp_r == null ? "" : d.tp_r) + '" placeholder="5" style="height:36px;padding:0 8px;width:70px;font-size:13px">') +
-      lab("Result", '<div class="tabs" style="padding:3px">' + resBtn("Win", "#7fd99a") + resBtn("Loss", "#ff8a8a") + resBtn("BE", "#c9ccd1") + "</div>") +
+      lab("Result", '<div class="tabs" style="padding:3px">' + resBtn("Win", "var(--t-7fd99a)") + resBtn("Loss", "var(--t-ff8a8a)") + resBtn("BE", "var(--t-c9ccd1)") + "</div>") +
       lab("R", '<input class="input" type="number" step="0.1" data-f="r" value="' + esc(d.r == null ? "" : d.r) + '" placeholder="' + (r == null ? "" : (Math.round(r * 10) / 10)) + '" title="Leave blank to work it out from the result. Type a number for partials." style="height:36px;padding:0 8px;width:70px;font-size:13px">') +
-      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c9ccd1;height:36px;cursor:pointer"><input type="checkbox" data-f="overlap"' + (d.overlap ? " checked" : "") + ' style="width:16px;height:16px">Overlap</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t-c9ccd1);height:36px;cursor:pointer"><input type="checkbox" data-f="overlap"' + (d.overlap ? " checked" : "") + ' style="width:16px;height:16px">Overlap</label>' +
       '<span class="' + cls(r || 0) + '" style="font-family:var(--sg);font-weight:600;font-size:16px;height:36px;display:flex;align-items:center;min-width:56px">' + (r == null ? '<span class="muted" style="font-size:12px">Open</span>' : rTxt(r)) + "</span>" +
       '<button class="x" data-del title="Delete trade" style="margin-left:auto;height:36px">×</button></div>';
   }
@@ -75,7 +75,7 @@
     var y = J.year, m = J.month, list = inMonth(y, m), s = stats(list);
     var html = '<div style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow">ADMIN</div><h1 class="title">Failed Break <span class="metal-text">journal.</span></h1>' +
       '<div class="note">Backtest the Failed Break Model day by day. Click + Trade under a day, fill in the trade, and it saves by itself.</div></div>';
-    if (J.err) html += '<div class="card pad note" style="color:#ff8a8a">Couldn\'t load your trades: ' + esc(J.err) + "</div>";
+    if (J.err) html += '<div class="card pad note" style="color:var(--t-ff8a8a)">Couldn\'t load your trades: ' + esc(J.err) + "</div>";
 
     html += '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">' +
       '<div class="tabs">' + PAIRS.map(function (p) { return '<button class="tab' + (J.pair === p ? " on" : "") + '" data-jp="' + p + '">' + p + "</button>"; }).join("") + "</div>" +
@@ -83,7 +83,7 @@
     // months with their R
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px">' + MONTHS.map(function (mn, i) {
       var ms = stats(inMonth(y, i)), on = i === m;
-      return '<button class="tab' + (on ? " on" : "") + '" data-jm="' + i + '" style="height:auto;padding:8px 6px;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 0 0 1px #1f2023"><span>' + mn.slice(0, 3) + '</span><span class="' + cls(ms.R) + '" style="font-size:11px">' + (ms.n || ms.open ? rTxt(ms.R) : "–") + "</span></button>";
+      return '<button class="tab' + (on ? " on" : "") + '" data-jm="' + i + '" style="height:auto;padding:8px 6px;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 0 0 1px var(--t-1f2023)"><span>' + mn.slice(0, 3) + '</span><span class="' + cls(ms.R) + '" style="font-size:11px">' + (ms.n || ms.open ? rTxt(ms.R) : "–") + "</span></button>";
     }).join("") + "</div>";
 
     var ys = stats(mine().filter(function (x) { return (x.data.date || "").slice(0, 4) === String(y); }));
@@ -97,7 +97,7 @@
       var ds = y + "-" + pad(m + 1) + "-" + pad(dd), wd = new Date(y, m, dd).getDay();
       var tr = list.filter(function (x) { return x.data.date === ds; }).sort(function (a, b) { return (a.data.entry_t || "99") < (b.data.entry_t || "99") ? -1 : 1; });
       var dsR = stats(tr);
-      days += '<div style="display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-top:1px solid #161618' + (wd === 0 || wd === 6 ? ";background:#09090a" : "") + '">' +
+      days += '<div style="display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-top:1px solid var(--t-161618)' + (wd === 0 || wd === 6 ? ";background:var(--t-09090a)" : "") + '">' +
         '<div style="display:flex;align-items:center;gap:12px"><b style="min-width:130px">' + DAYS[wd] + " " + dd + " " + MONTHS[m].slice(0, 3) + "</b>" +
         (tr.length ? '<span class="mini ' + cls(dsR.R) + '">' + tr.length + " trade" + (tr.length > 1 ? "s" : "") + (dsR.n ? " · " + rTxt(dsR.R) : "") + "</span>" : "") +
         '<button class="btn btn-ghost" data-add="' + ds + '" style="margin-left:auto;height:32px;padding:0 12px;font-size:13px">+ Trade</button></div>' +
