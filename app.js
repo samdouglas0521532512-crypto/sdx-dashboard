@@ -87,7 +87,7 @@
     ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["manualbt", "Manual backtest", "scandata"], ["fbjournal", "Failed Break journal", "journal"], ["notion", "My Notion", "notion"]]]
   ];
 
-  var ELITE_ONLY = ["journal"];
+  var ELITE_ONLY = ["journal", "scanners"];
   function isFree() { return !state.member || (state.member.plan || "") === "Trade Service"; }
   function brand() {
     return '<div class="brand-row"><img src="' + LOGO + '" alt="SD"><span class="sep"></span><span class="word">TRADING<br>EDUCATION</span></div>';
