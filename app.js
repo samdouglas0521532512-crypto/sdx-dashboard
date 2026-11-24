@@ -89,7 +89,8 @@
     ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["manualbt", "Manual backtest", "scandata"], ["fbjournal", "Failed Break journal", "journal"], ["notion", "My Notion", "notion"]]]
   ];
 
-  var ELITE_ONLY = ["journal", "scanners", "review"];
+  var ELITE_ONLY = ["journal", "review"];
+  var ADMIN_ONLY_NAV = ["scanners"]; // scanners hidden from Elite and free members
   function isFree() { return !state.member || (state.member.plan || "") === "Trade Service"; }
   function brand() {
     return '<div class="brand-row"><img class="logo-d" src="' + LOGO + '" alt="SD"><img class="logo-l" src="' + LOGO_DARK + '" alt="SD"><span class="sep"></span><span class="word">TRADING<br>EDUCATION</span></div>';
@@ -262,9 +263,9 @@
     var cur = route();
     var free = isFree();
     var admin = (state.member.plan || "") === "Admin";
-    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scandata" || cur === "manualbt" || cur === "fbjournal" || cur === "notion") && !admin)) { location.hash = "#/dashboard"; return; }
+    if ((free && ELITE_ONLY.indexOf(cur) > -1) || ((cur === "admin" || cur === "scanners" || cur === "scandata" || cur === "manualbt" || cur === "fbjournal" || cur === "notion") && !admin)) { location.hash = "#/dashboard"; return; }
     var nav = NAV.filter(function (g) { return g[0] !== "ADMIN" || admin; }).map(function (g) {
-      return '<div class="group"><div class="label">' + g[0] + "</div>" + g[1].filter(function (n) { return !(free && ELITE_ONLY.indexOf(n[0]) > -1); }).map(function (n) {
+      return '<div class="group"><div class="label">' + g[0] + "</div>" + g[1].filter(function (n) { return !(free && ELITE_ONLY.indexOf(n[0]) > -1) && !(!admin && ADMIN_ONLY_NAV.indexOf(n[0]) > -1); }).map(function (n) {
         var ext = n[4];
         var href = ext ? ext : "#/" + n[0];
         return '<a class="nav' + (cur === n[0] ? " active" : "") + (n[3] ? " soon" : "") + '" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener"' : "") + ">" + svg(n[2]) + esc(n[1]) + "</a>";
