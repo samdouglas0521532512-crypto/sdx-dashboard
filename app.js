@@ -83,7 +83,7 @@
   function svg(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + "</svg>"; }
   var NAV = [
     ["WORKSPACE", [["dashboard", "Dashboard", "dashboard"], ["prep", "Daily Prep", "prep"], ["progress", "My Progress", "progress"], ["service", "Trade Service", "service"], ["live", "Live Sessions", "live"], ["tracker", "Trade Tracker", "tracker"], ["breakdowns", "Trade Breakdowns", "breakdowns"], ["journal", "Journal", "journal"]]],
-    ["LEARN", [["education", "Education", "education"], ["coach", "AI Coach", "coach"], ["review", "Trade Review", "review"], ["calls", "1-1 Calls", "calls"]]],
+    ["LEARN", [["education", "Education", "education"], ["coach", "AI Coach", "coach"], ["review", "Trade Review", "review"], ["calls", "1-1 Booking", "calls"]]],
     ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["scanners", "Scanners", "scanners"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
     ["PARTNERS", [["brokers", "Brokers", "brokers"], ["edu", "Educational Platform", "edu", 0, C.ELITE_PACK_URL]]],
     ["HELP", [["support", "Support", "support"]]],
@@ -274,7 +274,7 @@
     }).join("");
     var nm = state.member.name || state.session.user.email.split("@")[0];
     var initials = nm.split(/\s+/).map(function (w) { return w[0]; }).join("").slice(0, 2).toUpperCase();
-    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", review: "Trade Review", calls: "1-1 Calls", support: "Support", admin: "Admin", scandata: "Entry model data", manualbt: "Manual backtest", fbjournal: "Failed Break journal", socials: "Socials", brokers: "Brokers" };
+    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", review: "Trade Review", calls: "1-1 Booking", support: "Support", admin: "Admin", scandata: "Entry model data", manualbt: "Manual backtest", fbjournal: "Failed Break journal", socials: "Socials", brokers: "Brokers" };
     app.innerHTML =
       '<div class="mbar"><button class="mbtn" id="menuBtn" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>' + brand() + '<button class="theme-btn" type="button"></button></div>' +
       '<div class="shell"><div class="scrim" id="scrim"></div><nav class="side" id="side" aria-label="Main menu">' + brand() + nav +

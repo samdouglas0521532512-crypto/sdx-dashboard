@@ -8,7 +8,11 @@ window.SDX_CONFIG = {
   // Your Calendly booking page, e.g. "https://calendly.com/sdx/1-1-call". Leave empty to use the times you add in Admin.
   CALENDLY_URL: "",
   // Who Elite members can book a 1-1 call with
-  CALL_HOSTS: [{ key: "sam", name: "Sam" }, { key: "harley", name: "Harley" }],
+  // image: a picture for each card (put the file in the dashboard folder, e.g. "call-sam.jpg"). Leave empty for the silver card.
+  CALL_HOSTS: [
+    { key: "sam", name: "Sam", image: "", blurb: "Go through your trading, your entries and your plan with me, one to one." },
+    { key: "harley", name: "Harley", image: "", blurb: "Go through your trading and your questions with Harley, one to one." }
+  ],
   // Only these logins see the Mech Model groups on the Trade Service page
   OWNER_EMAILS: ["samdouglas@sdtradingeducation.com"]
 };

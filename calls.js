@@ -8,6 +8,24 @@
   // ---------- who the call is with ----------
   function hosts() { return (window.SDX_CONFIG || {}).CALL_HOSTS || [{ key: "sam", name: "Sam" }]; }
   function hostName(d) { var k = (d && d.host) || "sam"; var h = hosts().filter(function (x) { return x.key === k; })[0]; return h ? h.name : "Sam"; }
+  function hostCards() {
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">' + hosts().map(function (h) {
+      var on = M.open && M.host === h.key;
+      var thumb = h.image
+        ? '<img src="' + esc(h.image) + '" alt="' + esc(h.name) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%">'
+        : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,#eceef1 0%,#a9aeb5 38%,#f5f6f8 52%,#868c95 78%,#d9dce0 100%)"></div>' +
+          '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 150px var(--sg);color:rgba(20,20,22,.82);letter-spacing:-4px">' + esc(h.name.charAt(0)) + "</div>";
+      return '<section class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column' + (on ? ";box-shadow:0 0 0 2px var(--t-c9ced6)" : "") + '">' +
+        '<div style="position:relative;aspect-ratio:16/10;background:#0b0b0c">' + thumb +
+        '<div style="position:absolute;inset:auto 0 0 0;padding:44px 22px 18px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.82))">' +
+        '<div style="font:600 11px Inter;letter-spacing:.2em;color:rgba(255,255,255,.75)">1-1 MENTORSHIP</div>' +
+        '<div style="font:700 38px var(--sg);color:#fff;line-height:1.05;margin-top:4px">' + esc(h.name) + "</div></div></div>" +
+        '<div style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:12px;flex:1">' +
+        '<div style="font:600 18px var(--sg)">Book a 1-1 mentorship call with ' + esc(h.name) + "</div>" +
+        (h.blurb ? '<div class="note" style="font-size:13px;line-height:1.55">' + esc(h.blurb) + "</div>" : "") +
+        '<div style="margin-top:auto"><button type="button" class="btn ' + (on ? "btn-ghost" : "btn-metal") + '" data-book="' + esc(h.key) + '">' + (on ? "Booking with " : "Book with ") + esc(h.name) + "</button></div></div></section>";
+    }).join("") + "</div>";
+  }
   function hostPicker() {
     var hs = hosts();
     if (hs.length < 2) return "";
@@ -133,7 +151,9 @@
   }
 
   function requestForm() {
-    return hostPicker() + '<div class="note" style="font-size:13px">Pick up to three times that suit you (UK time). We\'ll book one or suggest another.</div>' +
+    var hn = hostName({ host: M.host });
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="eyebrow">YOUR 1-1 WITH ' + esc(hn.toUpperCase()) + '</div><button type="button" class="btn btn-ghost" id="rqBack" style="min-height:36px">Change</button></div>' +
+      '<div class="note" style="font-size:13px">Pick up to three times that suit you (UK time). We\'ll book one or suggest another.</div>' +
       '<div style="display:flex;flex-direction:column;gap:10px">' + [1, 2, 3].map(function (n) { return '<label class="field">' + (n === 1 ? "Best time" : "Another time (optional)") + timeFields("rq", n) + "</label>"; }).join("") + "</div>" +
       '<label class="field">How long<select class="input" id="rqMins" style="max-width:200px">' + ["20", "30", "45", "60"].map(function (m) { return '<option value="' + m + '"' + (m === "30" ? " selected" : "") + ">" + m + " mins</option>"; }).join("") + "</select></label>" +
       '<label class="field">What do you want to go through?<textarea class="input" id="rqTopic" rows="4" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="e.g. My last three losses on gold, my entries on the Failed Break model, building my trading plan">' + esc(M.topic) + "</textarea></label>" +
@@ -142,7 +162,7 @@
 
   function draw(page) {
     var d = M.data;
-    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ELITE</div><h1>1-1 calls.</h1><div style="font-size:14px;color:#2a2c30">Book a 1-1 call' + (hosts().length > 1 ? " with " + hosts().map(function (h) { return h.name; }).join(" or ") : "") + '. Once it\'s done, the recording shows up here so you can watch it back.</div></section>';
+    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ELITE</div><h1>1-1 booking.</h1><div style="font-size:14px;color:#2a2c30">Book a 1-1 call' + (hosts().length > 1 ? " with " + hosts().map(function (h) { return h.name; }).join(" or ") : "") + '. Once it\'s done, the recording shows up here so you can watch it back.</div></section>';
     if (!d) { page.innerHTML = head + '<div class="note">Loading…</div>'; return; }
     var calls = d.calls || [];
     var next = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); }).sort(function (a, b) { return a.data.at > b.data.at ? 1 : -1; })[0];
@@ -182,17 +202,16 @@
     } else {
       var slots = d.slots || [], days = [], byDay = {};
       slots.forEach(function (s) { var k = dayKey(s.at); if (!byDay[k]) { byDay[k] = []; days.push(k); } byDay[k].push(s); });
-      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">' + (slots.length ? "BOOK A CALL" : "ASK FOR A CALL") + '</div>' +
-        (!slots.length ? requestForm() :
+      top = '<div class="eyebrow">BOOK A 1-1 MENTORSHIP CALL</div>' + hostCards() +
+        (M.open ? '<section class="card pad" id="rqCard" style="display:flex;flex-direction:column;gap:16px">' + requestForm() + "</section>" : "") +
+        (slots.length && !M.open ? '<section class="card pad" style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">OPEN TIMES WITH SAM</div>' +
           '<div class="note" style="font-size:13px">Pick a time. All times are UK time.</div>' +
           days.map(function (k) {
             return '<div style="display:flex;flex-direction:column;gap:8px"><div style="font:600 14px var(--sg)">' + esc(dayLabel(byDay[k][0].at)) + '</div><div class="chips">' +
               byDay[k].map(function (s) { return '<button type="button" class="chip' + (M.pick === s.id ? " on" : "") + '" data-slot="' + esc(s.id) + '">' + esc(hm(s.at)) + ' <span class="muted" style="font-size:11px">· ' + esc(s.mins || 30) + "m</span></button>"; }).join("") + "</div></div>";
           }).join("") +
           '<label class="field">What do you want to go through?<textarea class="input" id="clTopic" rows="4" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="e.g. My last three losses on gold, my entries on the Failed Break model, building my trading plan">' + esc(M.topic) + "</textarea></label>" +
-          '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-metal" id="clBook"' + (M.busy ? " disabled" : "") + ">" + (M.busy ? "Booking…" : "Book this call") + "</button>") +
-        (slots.length ? '<span class="note">' + esc(M.msg) + "</span></div>" : "") +
-        (slots.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font:600 14px var(--sg)">None of these work? Ask for your own time</summary><div style="display:flex;flex-direction:column;gap:14px;margin-top:14px">' + requestForm() + "</div></details>" : "") + "</section>";
+          '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-metal" id="clBook"' + (M.busy ? " disabled" : "") + ">" + (M.busy ? "Booking…" : "Book this call") + "</button>" + '<span class="note">' + esc(M.msg) + "</span></div></section>" : "");
     }
 
     page.innerHTML = head + (M.err ? '<div class="note">' + esc(M.err) + "</div>" : "") + top +
@@ -225,6 +244,11 @@
       catch (e) { M.msg = e.message; await load(); }
       M.busy = false; draw(page);
     };
+    $$("[data-book]", page).forEach(function (b) {
+      b.onclick = function () { M.host = b.dataset.book; M.open = true; M.msg = ""; draw(page); var c = $("#rqCard", page); if (c) c.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    });
+    var back = $("#rqBack", page);
+    if (back) back.onclick = function () { var t = $("#rqTopic", page); if (t) M.topic = t.value; M.open = false; M.msg = ""; draw(page); };
     $$("[data-host]", page).forEach(function (b) {
       b.onclick = function () { M.host = b.dataset.host; $$("[data-host]", page).forEach(function (x) { x.classList.toggle("on", x === b); }); };
     });
@@ -235,7 +259,7 @@
       if (!opts.length) { M.msg = "Pick a date and a time first."; draw(page); return; }
       if (opts.some(function (o) { return !future(o); })) { M.msg = "One of those times has already passed."; draw(page); return; }
       M.busy = true; M.msg = ""; draw(page);
-      try { await api("/calls/request", { options: opts, mins: +$("#rqMins", page).value || 30, topic: M.topic.trim(), host: M.host || hosts()[0].key }); M.topic = ""; M.msg = "Request sent."; await load(); }
+      try { await api("/calls/request", { options: opts, mins: +$("#rqMins", page).value || 30, topic: M.topic.trim(), host: M.host || hosts()[0].key }); M.topic = ""; M.open = false; M.msg = "Request sent."; await load(); }
       catch (e) { M.msg = e.message; }
       M.busy = false; draw(page);
     };
