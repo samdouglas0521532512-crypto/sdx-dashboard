@@ -7,6 +7,8 @@ window.SDX_CONFIG = {
   ELITE_PACK_URL: "https://www.sdxtrading.education/",
   // Your Calendly booking page, e.g. "https://calendly.com/sdx/1-1-call". Leave empty to use the times you add in Admin.
   CALENDLY_URL: "",
+  // Who Elite members can book a 1-1 call with
+  CALL_HOSTS: [{ key: "sam", name: "Sam" }, { key: "harley", name: "Harley" }],
   // Only these logins see the Mech Model groups on the Trade Service page
   OWNER_EMAILS: ["samdouglas@sdtradingeducation.com"]
 };

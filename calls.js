@@ -5,6 +5,18 @@
   function X() { return window.SDX; }
   function api(path, body) { return window.SDX_ADMIN_CORE.call(path, body); }
 
+  // ---------- who the call is with ----------
+  function hosts() { return (window.SDX_CONFIG || {}).CALL_HOSTS || [{ key: "sam", name: "Sam" }]; }
+  function hostName(d) { var k = (d && d.host) || "sam"; var h = hosts().filter(function (x) { return x.key === k; })[0]; return h ? h.name : "Sam"; }
+  function hostPicker() {
+    var hs = hosts();
+    if (hs.length < 2) return "";
+    if (!M.host) M.host = hs[0].key;
+    return '<div class="field">Who do you want to book with?<div class="chips" style="margin-top:6px">' + hs.map(function (h) {
+      return '<button type="button" class="chip' + (M.host === h.key ? " on" : "") + '" data-host="' + esc(h.key) + '" style="min-height:40px;padding:0 18px">' + esc(h.name) + "</button>";
+    }).join("") + "</div></div>";
+  }
+
   // ---------- Calendly ----------
   function calUrl() { return String((window.SDX_CONFIG || {}).CALENDLY_URL || "").trim(); }
   var calScript = null;
@@ -110,7 +122,7 @@
   function notes(d, who) {
     return d.notes ? '<div style="padding:14px 16px;border-radius:12px;background:var(--t-121214);box-shadow:inset 0 0 0 1px var(--t-c9ccd1)"><div class="eyebrow">' + esc(who) + '</div><div style="font-size:14px;line-height:1.65;margin-top:6px;white-space:pre-wrap">' + esc(d.notes) + "</div></div>" : "";
   }
-  window.SDX_CALL_PARTS = { ukIso: ukIso, when: when, callTag: callTag, recording: recording, notes: notes, future: future, hm: hm, dayKey: dayKey, dayLabel: dayLabel, tag: tag };
+  window.SDX_CALL_PARTS = { hostName: hostName, ukIso: ukIso, when: when, callTag: callTag, recording: recording, notes: notes, future: future, hm: hm, dayKey: dayKey, dayLabel: dayLabel, tag: tag };
 
   // ======================= MEMBER PAGE =======================
   var M = { data: null, pick: null, topic: "", msg: "", busy: false };
@@ -121,7 +133,7 @@
   }
 
   function requestForm() {
-    return '<div class="note" style="font-size:13px">Tell me when suits you. Give me up to three times (UK time) and I\'ll book one or suggest another.</div>' +
+    return hostPicker() + '<div class="note" style="font-size:13px">Pick up to three times that suit you (UK time). We\'ll book one or suggest another.</div>' +
       '<div style="display:flex;flex-direction:column;gap:10px">' + [1, 2, 3].map(function (n) { return '<label class="field">' + (n === 1 ? "Best time" : "Another time (optional)") + timeFields("rq", n) + "</label>"; }).join("") + "</div>" +
       '<label class="field">How long<select class="input" id="rqMins" style="max-width:200px">' + ["20", "30", "45", "60"].map(function (m) { return '<option value="' + m + '"' + (m === "30" ? " selected" : "") + ">" + m + " mins</option>"; }).join("") + "</select></label>" +
       '<label class="field">What do you want to go through?<textarea class="input" id="rqTopic" rows="4" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="e.g. My last three losses on gold, my entries on the Failed Break model, building my trading plan">' + esc(M.topic) + "</textarea></label>" +
@@ -130,7 +142,7 @@
 
   function draw(page) {
     var d = M.data;
-    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ELITE</div><h1>1-1 calls.</h1><div style="font-size:14px;color:#2a2c30">Book a call with me. Once we\'ve done it, the recording shows up here so you can watch it back.</div></section>';
+    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ELITE</div><h1>1-1 calls.</h1><div style="font-size:14px;color:#2a2c30">Book a 1-1 call' + (hosts().length > 1 ? " with " + hosts().map(function (h) { return h.name; }).join(" or ") : "") + '. Once it\'s done, the recording shows up here so you can watch it back.</div></section>';
     if (!d) { page.innerHTML = head + '<div class="note">Loading…</div>'; return; }
     var calls = d.calls || [];
     var next = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); }).sort(function (a, b) { return a.data.at > b.data.at ? 1 : -1; })[0];
@@ -142,23 +154,23 @@
       var q = pending.data;
       top = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px">' +
         (q.status === "proposed" ?
-          '<div class="eyebrow">SAM SUGGESTED A NEW TIME</div><div style="font:600 24px var(--sg)">' + esc(when(q.at)) + ' <span class="muted" style="font:500 13px Inter">UK time · ' + esc(q.mins || 30) + " mins</span></div>" +
+          '<div class="eyebrow">' + esc(hostName(q).toUpperCase()) + ' SUGGESTED A NEW TIME</div><div style="font:600 24px var(--sg)">' + esc(when(q.at)) + ' <span class="muted" style="font:500 13px Inter">UK time · ' + esc(q.mins || 30) + " mins</span></div>" +
           (q.sam_message ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">' + esc(q.sam_message) + "</div>" : "") +
           '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><button class="btn btn-metal" id="clYes" data-id="' + esc(pending.id) + '">Yes, book it</button>' +
           '<button class="btn btn-ghost" id="clCancel" data-id="' + esc(pending.id) + '">That doesn\'t work, cancel</button><span class="note">' + esc(M.msg) + "</span></div>" :
-          '<div class="eyebrow">CALL REQUESTED</div><div style="font-size:14px;line-height:1.6">I\'ve got your request. I\'ll book one of your times, or suggest another, and it\'ll show here. You\'ll get a Telegram message too.</div>' +
+          '<div class="eyebrow">CALL REQUESTED WITH ' + esc(hostName(q).toUpperCase()) + '</div><div style="font-size:14px;line-height:1.6">' + esc(hostName(q)) + ' will book one of your times, or suggest another, and it\'ll show here. You\'ll get a Telegram message too.</div>' +
           '<div><div class="eyebrow">THE TIMES YOU ASKED FOR</div><div class="chips" style="margin-top:6px">' + (q.options || []).map(function (o) { return '<span class="chip">' + esc(when(o)) + "</span>"; }).join("") + "</div></div>" +
           '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><button class="btn btn-ghost" id="clCancel" data-id="' + esc(pending.id) + '">Cancel my request</button><span class="note">' + esc(M.msg) + "</span></div>") +
         (q.topic ? '<div><div class="eyebrow">WHAT WE\'RE GOING THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(q.topic) + "</div></div>" : "") + "</section>";
     } else if (next) {
       var n = next.data;
-      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">YOUR NEXT CALL</div>' +
+      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">YOUR NEXT CALL WITH ' + esc(hostName(n).toUpperCase()) + '</div>' +
         '<div style="font:600 24px var(--sg)">' + esc(when(n.at)) + ' <span class="muted" style="font:500 13px Inter">UK time · ' + esc(n.mins || 30) + " mins</span></div>" +
-        (n.moved_at ? '<div class="note" style="font-size:13px">Sam moved this call to the time above.</div>' : "") +
+        (n.moved_at ? '<div class="note" style="font-size:13px">' + esc(hostName(n)) + ' moved this call to the time above.</div>' : "") +
         (n.sam_message ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">' + esc(n.sam_message) + "</div>" : "") +
         (n.topic ? '<div><div class="eyebrow">WHAT WE\'RE GOING THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(n.topic) + "</div></div>" : "") +
         '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
-        (n.link ? '<a class="btn btn-metal" href="' + esc(n.link) + '" target="_blank" rel="noopener">Join the call</a>' : '<span class="note">I\'ll add the call link here before we start.</span>') +
+        (n.link ? '<a class="btn btn-metal" href="' + esc(n.link) + '" target="_blank" rel="noopener">Join the call</a>' : '<span class="note">The call link will show here before you start.</span>') +
         (n.source === "calendly" && n.reschedule_url ? '<a class="btn btn-ghost" href="' + esc(n.reschedule_url) + '" target="_blank" rel="noopener">Change the time</a>' : "") +
         '<button class="btn btn-ghost" id="clCancel" data-id="' + esc(next.id) + '">Cancel this call</button><span class="note">' + esc(M.msg) + "</span></div></section>";
     } else if (calUrl()) {
@@ -191,8 +203,8 @@
           return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span style="font:600 17px var(--sg)">' + esc(when(x.at || (x.options || [])[0])) + "</span>" + callTag(x) + "</div>" +
             (x.topic ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;color:var(--t-c9ced6)">' + esc(x.topic) + "</div>" : "") +
             (x.status === "declined" && x.sam_message ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">' + esc(x.sam_message) + "</div>" : "") +
-            (x.status === "cancelled" || x.status === "declined" ? "" : recording(x) || '<div class="note" style="font-size:12px">I\'ll upload the recording here after the call.</div>') +
-            notes(x, "SAM'S NOTES") + "</section>";
+            (x.status === "cancelled" || x.status === "declined" ? "" : recording(x) || '<div class="note" style="font-size:12px">The recording goes here after the call.</div>') +
+            notes(x, hostName(x).toUpperCase() + "'S NOTES") + "</section>";
         }).join(""));
     wire(page);
   }
@@ -213,6 +225,9 @@
       catch (e) { M.msg = e.message; await load(); }
       M.busy = false; draw(page);
     };
+    $$("[data-host]", page).forEach(function (b) {
+      b.onclick = function () { M.host = b.dataset.host; $$("[data-host]", page).forEach(function (x) { x.classList.toggle("on", x === b); }); };
+    });
     var rs = $("#rqSend", page);
     if (rs) rs.onclick = async function () {
       var opts = [1, 2, 3].map(function (n) { return ukIso(($('[data-rqd="' + n + '"]', page) || {}).value, ($('[data-rqt="' + n + '"]', page) || {}).value); }).filter(Boolean);
@@ -220,7 +235,7 @@
       if (!opts.length) { M.msg = "Pick a date and a time first."; draw(page); return; }
       if (opts.some(function (o) { return !future(o); })) { M.msg = "One of those times has already passed."; draw(page); return; }
       M.busy = true; M.msg = ""; draw(page);
-      try { await api("/calls/request", { options: opts, mins: +$("#rqMins", page).value || 30, topic: M.topic.trim() }); M.topic = ""; M.msg = "Request sent."; await load(); }
+      try { await api("/calls/request", { options: opts, mins: +$("#rqMins", page).value || 30, topic: M.topic.trim(), host: M.host || hosts()[0].key }); M.topic = ""; M.msg = "Request sent."; await load(); }
       catch (e) { M.msg = e.message; }
       M.busy = false; draw(page);
     };
@@ -256,12 +271,17 @@
 
   function adminTab() {
     if (!A.data) return '<div class="note">Loading calls…</div>';
-    var calls = A.data.calls || [];
+    var allCalls = A.data.calls || [];
+    var calls = A.host ? allCalls.filter(function (c) { return (c.data.host || "sam") === A.host; }) : allCalls;
+    var hostBar = hosts().length < 2 ? "" : '<div class="chips">' + [{ key: "", name: "Everyone" }].concat(hosts()).map(function (h) {
+      return '<button type="button" class="chip' + ((A.host || "") === h.key ? " on" : "") + '" data-ahost="' + esc(h.key) + '">' + esc(h.key ? h.name + "'s calls" : "All calls") + "</button>";
+    }).join("") + "</div>";
+    function withTag(d) { return hosts().length < 2 ? "" : '<span class="muted" style="font-size:12px">With ' + esc(hostName(d)) + "</span>"; }
     var upcoming = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); });
     var requests = calls.filter(function (c) { return c.data.status === "requested" || c.data.status === "proposed"; });
     function reqCard(c) {
       var d = c.data, id = esc(c.id);
-      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(d.mins || 30) + " mins</span></div>" + callTag(d) + "</div>" +
+      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(d.mins || 30) + " mins</span>" + withTag(d) + "</div>" + callTag(d) + "</div>" +
         (d.topic ? '<div><div class="eyebrow">WHAT THEY WANT TO GO THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(d.topic) + "</div></div>" : "") +
         (d.status === "proposed" ? '<div class="note">You suggested ' + esc(when(d.at)) + " UK. Waiting for them to say yes.</div>" :
           '<div><div class="eyebrow">TIMES THEY ASKED FOR · TAP ONE TO BOOK IT</div><div class="chips" style="margin-top:6px">' + (d.options || []).map(function (o) { return '<button type="button" class="chip" data-rbook="' + id + '" data-at="' + esc(o) + '"' + (future(o) ? "" : " disabled") + ">" + esc(when(o)) + "</button>"; }).join("") + "</div></div>") +
@@ -274,7 +294,7 @@
     var open = (A.data.slots || []).filter(function (s) { return !s.booked && future(s.at); });
     function callCard(c, mode) {
       var d = c.data, id = esc(c.id), dr = A.draft[c.id] || {};
-      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(when(d.at)) + " UK · " + esc(d.mins || 30) + " mins</span></div>" + callTag(d) + "</div>" +
+      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(when(d.at)) + " UK · " + esc(d.mins || 30) + " mins</span>" + withTag(d) + "</div>" + callTag(d) + "</div>" +
         (d.topic ? '<div><div class="eyebrow">WHAT THEY WANT TO GO THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(d.topic) + "</div></div>" : "") +
         (mode === "upcoming" ?
           '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:240px">Call link<input class="input" data-clink="' + id + '" placeholder="Zoom or Google Meet link" value="' + esc(dr.link != null ? dr.link : (d.link || "")) + '"></label><button class="btn btn-ghost" data-csave="' + id + '">Save link</button><button class="btn btn-ghost" data-ccancel="' + id + '">Cancel call</button></div>' +
@@ -292,6 +312,7 @@
       (A.data.calendly ? "" : '<div class="note" style="color:var(--t-ffb26b)">Calendly isn\'t connected to the server yet, so bookings won\'t show here. Add CALENDLY_TOKEN on Render (sdxtradefeed).</div>') +
       '<div><a class="btn btn-ghost" href="https://calendly.com/app/availability/schedules" target="_blank" rel="noopener">Set my times in Calendly</a></div></section>';
     return (A.msg ? '<div class="note">' + esc(A.msg) + "</div>" : "") +
+      hostBar +
       '<div class="eyebrow">REQUESTS (' + requests.length + ")</div>" +
       (requests.length ? requests.map(reqCard).join("") : '<div class="card pad note" style="text-align:center">No requests right now.</div>') +
       (calUrl() ? calCard : (
@@ -339,6 +360,7 @@
         redraw();
       };
     });
+    $$("[data-ahost]", page).forEach(function (b) { b.onclick = function () { A.host = b.dataset.ahost; redraw(); }; });
     function pickTime(prefix) { return ukIso(($('[data-' + prefix + 'd="1"]', page) || {}).value, ($('[data-' + prefix + 't="1"]', page) || {}).value); }
     async function adminSend(body, ok) {
       try { var r = await api("/admin/call", body); put(body.id, r.data); A.msg = ok; }
