@@ -168,6 +168,16 @@
     var next = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); }).sort(function (a, b) { return a.data.at > b.data.at ? 1 : -1; })[0];
     var pending = calls.filter(function (c) { return c.data.status === "requested" || c.data.status === "proposed"; })[0];
     var past = calls.filter(function (c) { return c !== next && c !== pending; });
+    var recs = past.filter(function (c) { return c.data.recording_path || c.data.recording_link; });
+    var others = past.filter(function (c) { return recs.indexOf(c) < 0; });
+    function pastCard(c) {
+      var x = c.data;
+      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:2px"><span style="font:600 17px var(--sg)">1-1 with ' + esc(hostName(x)) + '</span><span class="muted" style="font-size:12px">' + esc(when(x.at || (x.options || [])[0])) + " UK</span></div>" + callTag(x) + "</div>" +
+        (x.topic ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;color:var(--t-c9ced6)">' + esc(x.topic) + "</div>" : "") +
+        (x.status === "declined" && x.sam_message ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">' + esc(x.sam_message) + "</div>" : "") +
+        (x.status === "cancelled" || x.status === "declined" ? "" : recording(x) || '<div class="note" style="font-size:12px">The recording goes here after the call.</div>') +
+        notes(x, hostName(x).toUpperCase() + "'S NOTES") + "</section>";
+    }
 
     var top;
     if (!next && pending) {
@@ -215,16 +225,9 @@
     }
 
     page.innerHTML = head + (M.err ? '<div class="note">' + esc(M.err) + "</div>" : "") + top +
-      '<div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">YOUR CALLS</span><span class="muted" style="font-size:12px">' + past.length + " so far</span></div>" +
-      (!past.length ? '<div class="card pad note" style="text-align:center">No calls yet. After your first call, the recording will show here.</div>' :
-        past.map(function (c) {
-          var x = c.data;
-          return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span style="font:600 17px var(--sg)">' + esc(when(x.at || (x.options || [])[0])) + "</span>" + callTag(x) + "</div>" +
-            (x.topic ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;color:var(--t-c9ced6)">' + esc(x.topic) + "</div>" : "") +
-            (x.status === "declined" && x.sam_message ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">' + esc(x.sam_message) + "</div>" : "") +
-            (x.status === "cancelled" || x.status === "declined" ? "" : recording(x) || '<div class="note" style="font-size:12px">The recording goes here after the call.</div>') +
-            notes(x, hostName(x).toUpperCase() + "'S NOTES") + "</section>";
-        }).join(""));
+      '<div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">1-1 RECORDINGS</span><span class="muted" style="font-size:12px">' + recs.length + (recs.length === 1 ? " recording" : " recordings") + "</span></div>" +
+      (!recs.length ? '<div class="card pad note" style="text-align:center">After each call, the recording goes here and stays here, so you can watch it back any time.</div>' : recs.map(pastCard).join("")) +
+      (others.length ? '<div class="eyebrow">OTHER CALLS</div>' + others.map(pastCard).join("") : "");
     wire(page);
   }
 
@@ -321,10 +324,11 @@
       return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(when(d.at)) + " UK · " + esc(d.mins || 30) + " mins</span>" + withTag(d) + "</div>" + callTag(d) + "</div>" +
         (d.topic ? '<div><div class="eyebrow">WHAT THEY WANT TO GO THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(d.topic) + "</div></div>" : "") +
         (mode === "upcoming" ?
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:240px">Call link<input class="input" data-clink="' + id + '" placeholder="Zoom or Google Meet link" value="' + esc(dr.link != null ? dr.link : (d.link || "")) + '"></label><button class="btn btn-ghost" data-csave="' + id + '">Save link</button><button class="btn btn-ghost" data-ccancel="' + id + '">Cancel call</button></div>' +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:240px">Call link<input class="input" data-clink="' + id + '" placeholder="' + (A.data.zoom ? "Made by Zoom when booked" : "Zoom or Google Meet link") + '" value="' + esc(dr.link != null ? dr.link : (d.link || "")) + '"></label><button class="btn btn-ghost" data-csave="' + id + '">Save link</button><button class="btn btn-ghost" data-ccancel="' + id + '">Cancel call</button></div>' +
           '<details><summary style="cursor:pointer;font-size:13px">Change the time</summary><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">' + timeFields("mv" + id, 1) +
           '<input class="input" data-mvmsg="' + id + '" placeholder="Message for them (optional)"><div><button class="btn btn-ghost" data-cmove="' + id + '">Move the call</button></div></div></details>' :
           (mode === "done" ? recording(d) : "") +
+          (mode === "waiting" && d.zoom_meeting_id && A.data.zoom ? '<div class="note" style="font-size:12px">This was a Zoom call, so the recording gets added by itself once Zoom has it ready. You can still upload one here.</div>' : "") +
           '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label class="btn btn-metal" style="cursor:pointer">' + (A.up[c.id] ? "Uploading…" : (mode === "done" ? "Replace recording" : "Upload recording")) + '<input type="file" accept="video/*,audio/*" data-cfile="' + id + '" style="display:none"' + (A.up[c.id] ? " disabled" : "") + '></label><span class="muted" style="font-size:12px">or paste a link</span>' +
           '<input class="input" data-crlink="' + id + '" placeholder="Google Drive or Zoom recording link" style="flex:1;min-width:220px" value="' + esc(dr.recording_link != null ? dr.recording_link : (d.recording_link || "")) + '"></div>' +
           '<label class="field">Notes for them (optional)<textarea class="input" data-cnotes="' + id + '" rows="3" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="What we covered and what to work on next.">' + esc(dr.notes != null ? dr.notes : (d.notes || "")) + "</textarea></label>" +
