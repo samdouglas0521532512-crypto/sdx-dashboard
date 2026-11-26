@@ -4,6 +4,7 @@
   var P = window.SDX_PAGES;
   function X() { return window.SDX; }
   function C() { return window.SDX_ADMIN_CORE; }
+  function CA() { return window.SDX_CALLS_ADMIN; }
   function esc(s) { return X().esc(s); }
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -50,7 +51,7 @@
   function tabs() {
     var pend = allReqs().filter(function (r) { return r.status === "requested"; }).length;
     var rw = (RV.rows || []).filter(function (x) { return (x.data || {}).status !== "reviewed"; }).length;
-    var t = [["overview", "Overview"], ["students", "Students"], ["reviews", "Trade reviews" + (rw ? " (" + rw + ")" : "")], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
+    var t = [["overview", "Overview"], ["students", "Students"], ["reviews", "Trade reviews" + (rw ? " (" + rw + ")" : "")], ["calls", "1-1 calls" + (CA() && CA().waiting() ? " (" + CA().waiting() + ")" : "")], ["scanners", "Scanner access" + (pend ? " (" + pend + ")" : "")], ["import", "Add Elite members"], ["access", "Access"]];
     return '<div class="chips" style="margin-top:4px">' + t.map(function (x) { return '<button class="chip' + (S.tab === x[0] ? " on" : "") + '" data-atab="' + x[0] + '">' + esc(x[1]) + "</button>"; }).join("") + "</div>";
   }
   function wire(page) {
@@ -206,15 +207,16 @@
   // ---------- page ----------
   function draw(page) {
     if (S.tab === "access") { C().drawAccess(page); return; }
-    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", import: "Add people who already paid for the Elite Pack."}[S.tab];
+    var sub = { overview: "How your students are getting on.", students: "Every student, what they're using and how they're doing. Tap one for more.", scanners: "Students asking for access to the scanners on TradingView.", calls: "Open times for 1-1 calls, see who has booked, and upload the recordings.", import: "Add people who already paid for the Elite Pack."}[S.tab];
     page.innerHTML = head(sub) + tabs() + (S.msg ? '<div class="note">' + esc(S.msg) + "</div>" : "") +
-      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "reviews" ? reviewsTab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
+      (S.tab === "overview" ? overview() : S.tab === "students" ? studentsTab() : S.tab === "reviews" ? reviewsTab() : S.tab === "calls" ? CA().tab() : S.tab === "import" ? importTab() : scannersTab()) + (S.open ? detail() : "");
     wire(page);
     wireImport(page);
     $$("[data-open]", page).forEach(function (b) { b.onclick = function () { openStudent(page, b.dataset.open); }; });
     $$("[data-ap]", page).forEach(function (b) { b.onclick = function () { S.plan = b.dataset.ap; draw(page); }; });
     $$("[data-rf]", page).forEach(function (b) { b.onclick = function () { S.reqFilter = b.dataset.rf; draw(page); }; });
     wireReviews(page);
+    if (S.tab === "calls") CA().wire(page, function () { if (document.body.contains(page) && S.tab === "calls") draw(page); });
     var q = $("#aQ", page);
     if (q) q.oninput = function () { S.q = q.value; var pos = q.selectionStart; draw(page); var n = $("#aQ", page); n.focus(); n.setSelectionRange(pos, pos); };
     var so = $("#aSort", page); if (so) so.onchange = function () { S.sort = so.value; draw(page); };

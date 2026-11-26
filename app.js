@@ -77,19 +77,20 @@
     scandata: '<line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="13"/><line x1="21" y1="20" x2="3" y2="20"/>',
     notion: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
     review: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><polyline points="8 10 11 13 16 8"/>',
+    calls: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
     edu: '<path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>'
   };
   function svg(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + "</svg>"; }
   var NAV = [
     ["WORKSPACE", [["dashboard", "Dashboard", "dashboard"], ["prep", "Daily Prep", "prep"], ["progress", "My Progress", "progress"], ["service", "Trade Service", "service"], ["live", "Live Sessions", "live"], ["tracker", "Trade Tracker", "tracker"], ["breakdowns", "Trade Breakdowns", "breakdowns"], ["journal", "Journal", "journal"]]],
-    ["LEARN", [["education", "Education", "education"], ["coach", "AI Coach", "coach"], ["review", "Trade Review", "review"]]],
+    ["LEARN", [["education", "Education", "education"], ["coach", "AI Coach", "coach"], ["review", "Trade Review", "review"], ["calls", "1-1 Calls", "calls"]]],
     ["TOOLKIT", [["calendar", "Calendar", "calendar"], ["scanners", "Scanners", "scanners"], ["lots", "Lot Sizing", "lots"], ["socials", "Socials", "socials"]]],
     ["PARTNERS", [["brokers", "Brokers", "brokers"], ["edu", "Educational Platform", "edu", 0, C.ELITE_PACK_URL]]],
     ["HELP", [["support", "Support", "support"]]],
     ["ADMIN", [["admin", "Admin", "admin"], ["scandata", "Entry model data", "scandata"], ["manualbt", "Manual backtest", "scandata"], ["fbjournal", "Failed Break journal", "journal"], ["notion", "My Notion", "notion"]]]
   ];
 
-  var ELITE_ONLY = ["journal", "review"];
+  var ELITE_ONLY = ["journal", "review", "calls"];
   var ADMIN_ONLY_NAV = ["scanners"]; // scanners hidden from Elite and free members
   function isFree() { return !state.member || (state.member.plan || "") === "Trade Service"; }
   function brand() {
@@ -273,7 +274,7 @@
     }).join("");
     var nm = state.member.name || state.session.user.email.split("@")[0];
     var initials = nm.split(/\s+/).map(function (w) { return w[0]; }).join("").slice(0, 2).toUpperCase();
-    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", review: "Trade Review", support: "Support", admin: "Admin", scandata: "Entry model data", manualbt: "Manual backtest", fbjournal: "Failed Break journal", socials: "Socials", brokers: "Brokers" };
+    var titles = { dashboard: "Dashboard", service: "Trade Service", tracker: "Trade Tracker", breakdowns: "Trade Breakdowns", live: "Live Sessions", journal: "Journal", calendar: "Calendar", lots: "Lot Sizing", education: "Education", results: "My Results", coach: "AI Coach", review: "Trade Review", calls: "1-1 Calls", support: "Support", admin: "Admin", scandata: "Entry model data", manualbt: "Manual backtest", fbjournal: "Failed Break journal", socials: "Socials", brokers: "Brokers" };
     app.innerHTML =
       '<div class="mbar"><button class="mbtn" id="menuBtn" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>' + brand() + '<button class="theme-btn" type="button"></button></div>' +
       '<div class="shell"><div class="scrim" id="scrim"></div><nav class="side" id="side" aria-label="Main menu">' + brand() + nav +

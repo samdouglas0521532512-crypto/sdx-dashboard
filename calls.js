@@ -1,0 +1,244 @@
+/* SDX Members Dashboard: 1-1 Calls (Elite members book a call with Sam, then watch the recording back) */
+(function () {
+  "use strict";
+  var P = window.SDX_PAGES;
+  function X() { return window.SDX; }
+  function api(path, body) { return window.SDX_ADMIN_CORE.call(path, body); }
+  function esc(s) { return X().esc(s); }
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+  var TZ = "Europe/London";
+  function when(at) {
+    return at ? new Date(at).toLocaleString("en-GB", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  }
+  function dayKey(at) { return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(at)); }
+  function dayLabel(at) { return new Date(at).toLocaleDateString("en-GB", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }); }
+  function hm(at) { return new Date(at).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }); }
+  function future(at) { return at && new Date(at).getTime() > Date.now(); }
+  function tag(txt, kind) {
+    var c = kind === "good" ? "background:rgba(var(--r-127-217-154),.14);color:var(--t-7fd99a)"
+      : kind === "wait" ? "background:rgba(var(--r-255-159-67),.14);color:var(--t-ffb26b)"
+      : kind === "bad" ? "background:rgba(var(--r-255-138-138),.12);color:var(--t-ff8a8a)"
+      : "background:var(--t-1c1c1e);color:var(--t-c9ced6)";
+    return '<span class="tag" style="' + c + '">' + esc(txt) + "</span>";
+  }
+  function callTag(d) {
+    if (d.status === "cancelled") return tag("CANCELLED", "bad");
+    if (d.recording_path || d.recording_link) return tag("RECORDING READY", "good");
+    if (d.status === "booked" && future(d.at)) return tag("BOOKED", "");
+    return tag("RECORDING COMING", "wait");
+  }
+  function recording(d) {
+    var out = "";
+    if (d.recording_url) out += '<video controls preload="metadata" playsinline src="' + esc(d.recording_url) + '" style="width:100%;max-width:820px;border-radius:12px;background:#000;display:block"></video>';
+    if (d.recording_link) out += '<a class="btn btn-ghost" href="' + esc(d.recording_link) + '" target="_blank" rel="noopener" style="align-self:flex-start">Watch the recording</a>';
+    return out;
+  }
+  function notes(d, who) {
+    return d.notes ? '<div style="padding:14px 16px;border-radius:12px;background:var(--t-121214);box-shadow:inset 0 0 0 1px var(--t-c9ccd1)"><div class="eyebrow">' + esc(who) + '</div><div style="font-size:14px;line-height:1.65;margin-top:6px;white-space:pre-wrap">' + esc(d.notes) + "</div></div>" : "";
+  }
+  window.SDX_CALL_PARTS = { when: when, callTag: callTag, recording: recording, notes: notes, future: future, hm: hm, dayKey: dayKey, dayLabel: dayLabel, tag: tag };
+
+  // ======================= MEMBER PAGE =======================
+  var M = { data: null, pick: null, topic: "", msg: "", busy: false };
+
+  async function load() {
+    try { M.data = await api("/calls"); M.err = ""; }
+    catch (e) { M.data = { slots: [], calls: [] }; M.err = "Couldn't load your calls: " + e.message; }
+  }
+
+  function draw(page) {
+    var d = M.data;
+    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ELITE</div><h1>1-1 calls.</h1><div style="font-size:14px;color:#2a2c30">Book a call with me. Once we\'ve done it, the recording shows up here so you can watch it back.</div></section>';
+    if (!d) { page.innerHTML = head + '<div class="note">Loading…</div>'; return; }
+    var calls = d.calls || [];
+    var next = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); }).sort(function (a, b) { return a.data.at > b.data.at ? 1 : -1; })[0];
+    var past = calls.filter(function (c) { return c !== next; });
+
+    var top;
+    if (next) {
+      var n = next.data;
+      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">YOUR NEXT CALL</div>' +
+        '<div style="font:600 24px var(--sg)">' + esc(when(n.at)) + ' <span class="muted" style="font:500 13px Inter">UK time · ' + esc(n.mins || 30) + " mins</span></div>" +
+        (n.topic ? '<div><div class="eyebrow">WHAT WE\'RE GOING THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(n.topic) + "</div></div>" : "") +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
+        (n.link ? '<a class="btn btn-metal" href="' + esc(n.link) + '" target="_blank" rel="noopener">Join the call</a>' : '<span class="note">I\'ll add the call link here before we start.</span>') +
+        '<button class="btn btn-ghost" id="clCancel" data-id="' + esc(next.id) + '">Cancel this call</button><span class="note">' + esc(M.msg) + "</span></div></section>";
+    } else {
+      var slots = d.slots || [], days = [], byDay = {};
+      slots.forEach(function (s) { var k = dayKey(s.at); if (!byDay[k]) { byDay[k] = []; days.push(k); } byDay[k].push(s); });
+      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">BOOK A CALL</div>' +
+        (!slots.length ? '<div class="note">No times open right now. New times get added every week, so check back soon.</div>' :
+          '<div class="note" style="font-size:13px">Pick a time. All times are UK time.</div>' +
+          days.map(function (k) {
+            return '<div style="display:flex;flex-direction:column;gap:8px"><div style="font:600 14px var(--sg)">' + esc(dayLabel(byDay[k][0].at)) + '</div><div class="chips">' +
+              byDay[k].map(function (s) { return '<button type="button" class="chip' + (M.pick === s.id ? " on" : "") + '" data-slot="' + esc(s.id) + '">' + esc(hm(s.at)) + ' <span class="muted" style="font-size:11px">· ' + esc(s.mins || 30) + "m</span></button>"; }).join("") + "</div></div>";
+          }).join("") +
+          '<label class="field">What do you want to go through?<textarea class="input" id="clTopic" rows="4" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="e.g. My last three losses on gold, my entries on the Failed Break model, building my trading plan">' + esc(M.topic) + "</textarea></label>" +
+          '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-metal" id="clBook"' + (M.busy ? " disabled" : "") + ">" + (M.busy ? "Booking…" : "Book this call") + "</button>") +
+        '<span class="note">' + esc(M.msg) + "</span>" + (slots.length ? "</div>" : "") + "</section>";
+    }
+
+    page.innerHTML = head + (M.err ? '<div class="note">' + esc(M.err) + "</div>" : "") + top +
+      '<div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">YOUR CALLS</span><span class="muted" style="font-size:12px">' + past.length + " so far</span></div>" +
+      (!past.length ? '<div class="card pad note" style="text-align:center">No calls yet. After your first call, the recording will show here.</div>' :
+        past.map(function (c) {
+          var x = c.data;
+          return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span style="font:600 17px var(--sg)">' + esc(when(x.at)) + "</span>" + callTag(x) + "</div>" +
+            (x.topic ? '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;color:var(--t-c9ced6)">' + esc(x.topic) + "</div>" : "") +
+            (x.status === "cancelled" ? "" : recording(x) || '<div class="note" style="font-size:12px">I\'ll upload the recording here after the call.</div>') +
+            notes(x, "SAM'S NOTES") + "</section>";
+        }).join(""));
+    wire(page);
+  }
+
+  function wire(page) {
+    $$("[data-slot]", page).forEach(function (b) { b.onclick = function () { var t = $("#clTopic", page); if (t) M.topic = t.value; M.pick = b.dataset.slot; M.msg = ""; draw(page); }; });
+    var bk = $("#clBook", page);
+    if (bk) bk.onclick = async function () {
+      M.topic = $("#clTopic", page).value;
+      if (!M.pick) { M.msg = "Pick a time first."; draw(page); return; }
+      M.busy = true; M.msg = ""; draw(page);
+      try { await api("/calls/book", { slot_id: M.pick, topic: M.topic.trim() }); M.pick = null; M.topic = ""; M.msg = "Booked. See you on the call."; await load(); }
+      catch (e) { M.msg = e.message; await load(); }
+      M.busy = false; draw(page);
+    };
+    var cn = $("#clCancel", page);
+    if (cn) cn.onclick = async function () {
+      if (cn.dataset.sure !== "1") { cn.dataset.sure = "1"; cn.textContent = "Tap again to cancel"; return; }
+      cn.disabled = true;
+      try { await api("/calls/cancel", { id: cn.dataset.id }); M.msg = "Call cancelled. You can book another time."; await load(); }
+      catch (e) { M.msg = "Couldn't cancel: " + e.message; }
+      draw(page);
+    };
+  }
+
+  P.calls = function (page) {
+    draw(page);
+    load().then(function () { if (location.hash.indexOf("calls") > -1) draw(page); });
+  };
+
+  // ======================= ADMIN TAB =======================
+  var A = { data: null, msg: "", date: "", times: "", mins: "30", link: "", up: {}, draft: {} };
+
+  function adminLoad(redraw) {
+    return api("/admin/calls").then(function (j) { A.data = j; }).catch(function (e) { A.data = { slots: [], calls: [] }; A.msg = "Couldn't load calls: " + e.message; }).then(redraw);
+  }
+  function needsRec(c) { var d = c.data; return d.status !== "cancelled" && !future(d.at) && !d.recording_path && !d.recording_link; }
+
+  function adminTab() {
+    if (!A.data) return '<div class="note">Loading calls…</div>';
+    var calls = A.data.calls || [];
+    var upcoming = calls.filter(function (c) { return c.data.status === "booked" && future(c.data.at); });
+    var waiting = calls.filter(needsRec).reverse();
+    var done = calls.filter(function (c) { return c.data.recording_path || c.data.recording_link; }).reverse();
+    var open = (A.data.slots || []).filter(function (s) { return !s.booked && future(s.at); });
+    function callCard(c, mode) {
+      var d = c.data, id = esc(c.id), dr = A.draft[c.id] || {};
+      return '<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 17px var(--sg)">' + esc(c.name || c.email) + '</span><span class="muted" style="font-size:12px">' + esc(when(d.at)) + " UK · " + esc(d.mins || 30) + " mins</span></div>" + callTag(d) + "</div>" +
+        (d.topic ? '<div><div class="eyebrow">WHAT THEY WANT TO GO THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(d.topic) + "</div></div>" : "") +
+        (mode === "upcoming" ?
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="field" style="flex:1;min-width:240px">Call link<input class="input" data-clink="' + id + '" placeholder="Zoom or Google Meet link" value="' + esc(dr.link != null ? dr.link : (d.link || "")) + '"></label><button class="btn btn-ghost" data-csave="' + id + '">Save link</button><button class="btn btn-ghost" data-ccancel="' + id + '">Cancel call</button></div>' :
+          (mode === "done" ? recording(d) : "") +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label class="btn btn-metal" style="cursor:pointer">' + (A.up[c.id] ? "Uploading…" : (mode === "done" ? "Replace recording" : "Upload recording")) + '<input type="file" accept="video/*,audio/*" data-cfile="' + id + '" style="display:none"' + (A.up[c.id] ? " disabled" : "") + '></label><span class="muted" style="font-size:12px">or paste a link</span>' +
+          '<input class="input" data-crlink="' + id + '" placeholder="Google Drive or Zoom recording link" style="flex:1;min-width:220px" value="' + esc(dr.recording_link != null ? dr.recording_link : (d.recording_link || "")) + '"></div>' +
+          '<label class="field">Notes for them (optional)<textarea class="input" data-cnotes="' + id + '" rows="3" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="What we covered and what to work on next.">' + esc(dr.notes != null ? dr.notes : (d.notes || "")) + "</textarea></label>" +
+          '<div><button class="btn btn-ghost" data-cdone="' + id + '">Save</button></div>') +
+        "</section>";
+    }
+    return (A.msg ? '<div class="note">' + esc(A.msg) + "</div>" : "") +
+      '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">ADD TIMES</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">' +
+      '<label class="field">Date<input class="input" id="caDate" type="date" value="' + esc(A.date) + '"></label>' +
+      '<label class="field">Start times (UK)<input class="input" id="caTimes" placeholder="e.g. 13:00, 14:00, 15:30" value="' + esc(A.times) + '"></label>' +
+      '<label class="field">Length<select class="input" id="caMins">' + ["20", "30", "45", "60"].map(function (m) { return "<option value=\"" + m + "\"" + (A.mins === m ? " selected" : "") + ">" + m + " mins</option>"; }).join("") + "</select></label>" +
+      '<label class="field">Call link (optional)<input class="input" id="caLink" placeholder="Your Zoom link" value="' + esc(A.link) + '"></label></div>' +
+      '<div><button class="btn btn-metal" id="caAdd">Add times</button></div></section>' +
+      '<div class="eyebrow">COMING UP (' + upcoming.length + ")</div>" +
+      (upcoming.length ? upcoming.map(function (c) { return callCard(c, "upcoming"); }).join("") : '<div class="card pad note" style="text-align:center">No calls booked yet.</div>') +
+      '<div class="eyebrow">NEEDS A RECORDING (' + waiting.length + ")</div>" +
+      (waiting.length ? waiting.map(function (c) { return callCard(c, "waiting"); }).join("") : '<div class="card pad note" style="text-align:center">Nothing waiting.</div>') +
+      '<div class="eyebrow">OPEN TIMES (' + open.length + ")</div>" +
+      '<section class="card pad">' + (open.length ? '<div class="chips">' + open.map(function (s) { return '<span class="chip" style="display:inline-flex;gap:8px;align-items:center">' + esc(when(s.at)) + " · " + esc(s.mins || 30) + 'm<button type="button" data-crm="' + esc(s.id) + '" aria-label="Remove this time" style="border:none;background:none;color:inherit;cursor:pointer;font-size:15px;line-height:1">×</button></span>'; }).join("") + "</div>" : '<div class="note">No open times. Add some above.</div>') + "</section>" +
+      '<div class="eyebrow">DONE (' + done.length + ")</div>" +
+      (done.length ? done.map(function (c) { return callCard(c, "done"); }).join("") : '<div class="card pad note" style="text-align:center">No recordings uploaded yet.</div>');
+  }
+
+  function adminWire(page, redraw) {
+    if (!A.data && !A.loading) { A.loading = true; adminLoad(function () { A.loading = false; redraw(); }); }
+    function keepForm() { var d = $("#caDate", page); if (d) { A.date = d.value; A.times = $("#caTimes", page).value; A.mins = $("#caMins", page).value; A.link = $("#caLink", page).value; } }
+    $$("[data-clink]", page).forEach(function (i) { i.oninput = function () { (A.draft[i.dataset.clink] = A.draft[i.dataset.clink] || {}).link = i.value; }; });
+    $$("[data-crlink]", page).forEach(function (i) { i.oninput = function () { (A.draft[i.dataset.crlink] = A.draft[i.dataset.crlink] || {}).recording_link = i.value; }; });
+    $$("[data-cnotes]", page).forEach(function (i) { i.oninput = function () { (A.draft[i.dataset.cnotes] = A.draft[i.dataset.cnotes] || {}).notes = i.value; }; });
+    function put(id, data) { (A.data.calls || []).forEach(function (c) { if (String(c.id) === String(id)) c.data = data; }); delete A.draft[id]; }
+    var add = $("#caAdd", page);
+    if (add) add.onclick = async function () {
+      keepForm();
+      var times = A.times.split(/[,\s]+/).filter(Boolean);
+      if (!A.date || !times.length) { A.msg = "Pick a date and at least one start time."; redraw(); return; }
+      var bad = times.filter(function (t) { return !/^\d{1,2}[:.]\d{2}$/.test(t); });
+      if (bad.length) { A.msg = "Write times like 13:00 or 15:30."; redraw(); return; }
+      var slots = times.map(function (t) { var p = t.replace(".", ":").split(":"); return { at: new Date(A.date + "T" + ("0" + p[0]).slice(-2) + ":" + p[1] + ":00").toISOString(), mins: +A.mins, link: A.link.trim() }; });
+      add.disabled = true; add.textContent = "Adding…";
+      try { var r = await api("/admin/call-slots", { add: slots }); A.msg = r.added + (r.added === 1 ? " time added." : " times added.") + (r.added < slots.length ? " Times in the past were skipped." : ""); A.times = ""; A.data = null; }
+      catch (e) { A.msg = "Couldn't add times: " + e.message; }
+      redraw();
+    };
+    $$("[data-crm]", page).forEach(function (b) {
+      b.onclick = async function () {
+        try { await api("/admin/call-slots", { remove: [b.dataset.crm] }); A.data.slots = A.data.slots.filter(function (s) { return String(s.id) !== b.dataset.crm; }); A.msg = "Time removed."; }
+        catch (e) { A.msg = "Couldn't remove: " + e.message; }
+        redraw();
+      };
+    });
+    $$("[data-csave]", page).forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.dataset.csave;
+        try { var r = await api("/admin/call", { id: id, link: $('[data-clink="' + id + '"]', page).value }); put(id, r.data); A.msg = "Call link saved. They can see it on their 1-1 Calls page."; }
+        catch (e) { A.msg = "Couldn't save: " + e.message; }
+        redraw();
+      };
+    });
+    $$("[data-ccancel]", page).forEach(function (b) {
+      b.onclick = async function () {
+        if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Tap again to cancel"; return; }
+        try { var r = await api("/admin/call", { id: b.dataset.ccancel, status: "cancelled" }); put(b.dataset.ccancel, r.data); A.data = null; A.msg = "Call cancelled and the time is open again."; }
+        catch (e) { A.msg = "Couldn't cancel: " + e.message; }
+        redraw();
+      };
+    });
+    $$("[data-cdone]", page).forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.dataset.cdone;
+        var body = { id: id, notes: $('[data-cnotes="' + id + '"]', page).value, recording_link: $('[data-crlink="' + id + '"]', page).value };
+        try { var r = await api("/admin/call", body); put(id, r.data); A.msg = (r.data.recording_link || r.data.recording_path) ? "Saved. They can watch it on their 1-1 Calls page now." : "Saved."; }
+        catch (e) { A.msg = "Couldn't save: " + e.message; }
+        redraw();
+      };
+    });
+    $$("[data-cfile]", page).forEach(function (inp) {
+      inp.onchange = async function (e) {
+        var id = inp.dataset.cfile, f = (e.target.files || [])[0];
+        if (!f) return;
+        A.up[id] = true; A.msg = "Uploading " + f.name + " (" + Math.round(f.size / 1048576) + " MB). Keep this page open."; redraw();
+        try {
+          var s = await api("/admin/call-upload", { id: id, filename: f.name });
+          var up = await X().sb.storage.from(s.bucket).uploadToSignedUrl(s.path, s.token, f, { contentType: f.type || "video/mp4" });
+          if (up.error) throw up.error;
+          var r = await api("/admin/call", { id: id, recording_path: s.path });
+          put(id, r.data); A.msg = "Recording uploaded. They can watch it on their 1-1 Calls page now.";
+        } catch (er) {
+          var m = String(er.message || er);
+          A.msg = /size|large|413|exceed/i.test(m) ? "That file is too big to upload here. Put it on Google Drive (or use the Zoom cloud link) and paste the link instead." : "Couldn't upload: " + m;
+        }
+        A.up[id] = false; redraw();
+      };
+    });
+  }
+
+  window.SDX_CALLS_ADMIN = {
+    tab: adminTab, wire: adminWire,
+    waiting: function () { return A.data ? (A.data.calls || []).filter(needsRec).length : 0; }
+  };
+})();
