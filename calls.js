@@ -12,14 +12,14 @@
     return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">' + hosts().map(function (h) {
       var on = M.open && M.host === h.key;
       var thumb = h.image
-        ? '<img src="' + esc(h.image) + '" alt="' + esc(h.name) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%">'
+        ? '<img src="' + esc(h.image) + '" alt="' + esc(h.name) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center">'
         : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,#eceef1 0%,#a9aeb5 38%,#f5f6f8 52%,#868c95 78%,#d9dce0 100%)"></div>' +
           '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 150px var(--sg);color:rgba(20,20,22,.82);letter-spacing:-4px">' + esc(h.name.charAt(0)) + "</div>";
       return '<section class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column' + (on ? ";box-shadow:0 0 0 2px var(--t-c9ced6)" : "") + '">' +
-        '<div style="position:relative;aspect-ratio:16/10;background:#0b0b0c">' + thumb +
-        '<div style="position:absolute;inset:auto 0 0 0;padding:44px 22px 18px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.82))">' +
+        '<div style="position:relative;aspect-ratio:16/10;background:' + (h.image ? "#fff" : "#0b0b0c") + '">' + thumb +
+        (h.image ? "" : '<div style="position:absolute;inset:auto 0 0 0;padding:44px 22px 18px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.82))">' +
         '<div style="font:600 11px Inter;letter-spacing:.2em;color:rgba(255,255,255,.75)">1-1 MENTORSHIP</div>' +
-        '<div style="font:700 38px var(--sg);color:#fff;line-height:1.05;margin-top:4px">' + esc(h.name) + "</div></div></div>" +
+        '<div style="font:700 38px var(--sg);color:#fff;line-height:1.05;margin-top:4px">' + esc(h.name) + "</div></div>") + "</div>" +
         '<div style="padding:20px 22px 22px;display:flex;flex-direction:column;gap:12px;flex:1">' +
         '<div style="font:600 18px var(--sg)">Book a 1-1 mentorship call with ' + esc(h.name) + "</div>" +
         (h.blurb ? '<div class="note" style="font-size:13px;line-height:1.55">' + esc(h.blurb) + "</div>" : "") +

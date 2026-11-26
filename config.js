@@ -10,8 +10,8 @@ window.SDX_CONFIG = {
   // Who Elite members can book a 1-1 call with
   // image: a picture for each card (put the file in the dashboard folder, e.g. "call-sam.jpg"). Leave empty for the silver card.
   CALL_HOSTS: [
-    { key: "sam", name: "Sam", image: "", blurb: "Go through your trading, your entries and your plan with me, one to one." },
-    { key: "harley", name: "Harley", image: "", blurb: "Go through your trading and your questions with Harley, one to one." }
+    { key: "sam", name: "Sam", image: "call-sam.jpg", blurb: "Go through your trading, your entries and your plan with me, one to one." },
+    { key: "harley", name: "Harley", image: "call-harley.jpg", blurb: "Go through your trading and your questions with Harley, one to one." }
   ],
   // Only these logins see the Mech Model groups on the Trade Service page
   OWNER_EMAILS: ["samdouglas@sdtradingeducation.com"]
