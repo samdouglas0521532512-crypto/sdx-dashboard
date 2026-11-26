@@ -125,7 +125,7 @@
   function callTag(d) {
     if (d.status === "cancelled") return tag("CANCELLED", "bad");
     if (d.status === "declined") return tag("NOT BOOKED", "bad");
-    if (d.status === "requested") return tag("WAITING FOR SAM", "wait");
+    if (d.status === "requested") return tag("WAITING FOR " + hostName(d).toUpperCase(), "wait");
     if (d.status === "proposed") return tag("NEW TIME SUGGESTED", "wait");
     if (d.recording_path || d.recording_link) return tag("RECORDING READY", "good");
     if (d.status === "booked" && future(d.at)) return tag("BOOKED", "");
@@ -461,6 +461,18 @@
       };
     });
   }
+
+  // ======================= ADMIN: 1-1 REQUESTS PAGE =======================
+  P.callreqs = function (page) {
+    var head = '<section class="hero" style="min-height:170px"><div class="eyebrow">ADMIN</div><h1>1-1 requests.</h1><div style="font-size:14px;color:#2a2c30">Members asking for a 1-1 call. Book one of their times, suggest another, or say no. Then add the call link and the recording.</div></section>';
+    function redraw() {
+      if (!document.body.contains(page) || location.hash.indexOf("callreqs") < 0) return;
+      page.innerHTML = head + '<div style="display:flex;flex-direction:column;gap:18px">' + adminTab() + "</div>";
+      adminWire(page, redraw);
+    }
+    A.data = null; A.loading = false;
+    redraw();
+  };
 
   window.SDX_CALLS_ADMIN = {
     tab: adminTab, wire: adminWire,
