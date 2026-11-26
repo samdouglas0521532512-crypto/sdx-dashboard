@@ -4,6 +4,62 @@
   var P = window.SDX_PAGES;
   function X() { return window.SDX; }
   function api(path, body) { return window.SDX_ADMIN_CORE.call(path, body); }
+
+  // ---------- Calendly ----------
+  function calUrl() { return String((window.SDX_CONFIG || {}).CALENDLY_URL || "").trim(); }
+  var calScript = null;
+  function loadCalendly() {
+    if (window.Calendly) return Promise.resolve();
+    if (calScript) return calScript;
+    calScript = new Promise(function (ok, bad) {
+      var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://assets.calendly.com/assets/external/widget.css"; document.head.appendChild(l);
+      var sc = document.createElement("script"); sc.src = "https://assets.calendly.com/assets/external/widget.js"; sc.async = true;
+      sc.onload = function () { ok(); }; sc.onerror = function () { calScript = null; bad(new Error("Calendly didn't load")); };
+      document.head.appendChild(sc);
+    });
+    return calScript;
+  }
+  function calEmbedUrl() {
+    var u = calUrl(), light = document.documentElement.dataset.theme === "light";
+    var q = "hide_gdpr_banner=1&hide_landing_page_details=1" + (light ? "" : "&background_color=121214&text_color=e8e9eb&primary_color=c9ced6");
+    return u + (u.indexOf("?") > -1 ? "&" : "?") + q;
+  }
+  function mountCalendly(page) {
+    var box = $("#clCal", page);
+    if (!box) return;
+    loadCalendly().then(function () {
+      if (!document.body.contains(box)) return;
+      box.innerHTML = "";
+      var st = X().state || {}, mem = st.member || {}, user = (st.session || {}).user || {};
+      window.Calendly.initInlineWidget({
+        url: calEmbedUrl(), parentElement: box,
+        prefill: { name: mem.name || "", email: user.email || "", customAnswers: { a1: M.topic || "" } },
+        utm: { utmSource: "sdx-dashboard" }
+      });
+    }).catch(function () {
+      box.style.height = "auto";
+      box.innerHTML = '<div class="note" style="padding:20px">The booking calendar didn\'t load. <a href="' + esc(calUrl()) + '" target="_blank" rel="noopener">Open it in a new tab</a> instead.</div>';
+    });
+  }
+  var calListening = false;
+  function listenCalendly() {
+    if (calListening) return;
+    calListening = true;
+    window.addEventListener("message", async function (e) {
+      if (e.origin !== "https://calendly.com" || !e.data || e.data.event !== "calendly.event_scheduled") return;
+      var p = e.data.payload || {}, page = document.getElementById("page");
+      var t = page && $("#clTopic", page); if (t) M.topic = t.value;
+      M.saving = true; M.msg = "";
+      try {
+        await api("/calls/calendly", { event_uri: (p.event || {}).uri, invitee_uri: (p.invitee || {}).uri, topic: (M.topic || "").trim() });
+        M.topic = ""; M.msg = "Booked. See you on the call.";
+      } catch (er) {
+        M.msg = "You're booked. Check your email for the details. (" + er.message + ")";
+      }
+      await load(); M.saving = false;
+      if (page && location.hash.indexOf("calls") > -1) draw(page);
+    });
+  }
   function esc(s) { return X().esc(s); }
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -64,7 +120,14 @@
         (n.topic ? '<div><div class="eyebrow">WHAT WE\'RE GOING THROUGH</div><div style="font-size:14px;line-height:1.6;margin-top:4px;white-space:pre-wrap">' + esc(n.topic) + "</div></div>" : "") +
         '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">' +
         (n.link ? '<a class="btn btn-metal" href="' + esc(n.link) + '" target="_blank" rel="noopener">Join the call</a>' : '<span class="note">I\'ll add the call link here before we start.</span>') +
+        (n.source === "calendly" && n.reschedule_url ? '<a class="btn btn-ghost" href="' + esc(n.reschedule_url) + '" target="_blank" rel="noopener">Change the time</a>' : "") +
         '<button class="btn btn-ghost" id="clCancel" data-id="' + esc(next.id) + '">Cancel this call</button><span class="note">' + esc(M.msg) + "</span></div></section>";
+    } else if (calUrl()) {
+      top = '<section class="card pad" style="display:flex;flex-direction:column;gap:16px"><div class="eyebrow">BOOK A CALL</div>' +
+        '<label class="field">What do you want to go through?<textarea class="input" id="clTopic" rows="3" style="height:auto;padding:12px 14px;line-height:1.5" placeholder="e.g. My last three losses on gold, my entries on the Failed Break model, building my trading plan">' + esc(M.topic) + "</textarea></label>" +
+        '<div class="note" style="font-size:13px">Then pick a time below. It books straight into my calendar and you\'ll get an email with the details.</div>' +
+        (M.saving ? '<div class="note">Saving your call…</div>' : '<div id="clCal" style="min-width:280px;height:720px;border-radius:12px;overflow:hidden"><div class="note" style="padding:20px">Loading the calendar…</div></div>') +
+        (M.msg ? '<span class="note">' + esc(M.msg) + "</span>" : "") + "</section>";
     } else {
       var slots = d.slots || [], days = [], byDay = {};
       slots.forEach(function (s) { var k = dayKey(s.at); if (!byDay[k]) { byDay[k] = []; days.push(k); } byDay[k].push(s); });
@@ -94,6 +157,11 @@
   }
 
   function wire(page) {
+    if (calUrl()) {
+      listenCalendly();
+      mountCalendly(page);
+      var tp = $("#clTopic", page); if (tp) tp.oninput = function () { M.topic = tp.value; };
+    }
     $$("[data-slot]", page).forEach(function (b) { b.onclick = function () { var t = $("#clTopic", page); if (t) M.topic = t.value; M.pick = b.dataset.slot; M.msg = ""; draw(page); }; });
     var bk = $("#clBook", page);
     if (bk) bk.onclick = async function () {
@@ -147,20 +215,24 @@
           '<div><button class="btn btn-ghost" data-cdone="' + id + '">Save</button></div>') +
         "</section>";
     }
-    return (A.msg ? '<div class="note">' + esc(A.msg) + "</div>" : "") +
+    var calCard = '<section class="card pad" style="display:flex;flex-direction:column;gap:10px"><div class="eyebrow">BOOKINGS COME FROM CALENDLY</div>' +
+      '<div style="font-size:14px;line-height:1.6">Elite members book on your Calendly page inside their 1-1 Calls page. Set the times you\'re free in Calendly and they show up for members straight away.</div>' +
+      (A.data.calendly ? "" : '<div class="note" style="color:var(--t-ffb26b)">Calendly isn\'t connected to the server yet, so bookings won\'t show here. Add CALENDLY_TOKEN on Render (sdxtradefeed).</div>') +
+      '<div><a class="btn btn-ghost" href="https://calendly.com/app/availability/schedules" target="_blank" rel="noopener">Set my times in Calendly</a></div></section>';
+    return (A.msg ? '<div class="note">' + esc(A.msg) + "</div>" : "") + (calUrl() ? calCard : (
       '<section class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="eyebrow">ADD TIMES</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">' +
       '<label class="field">Date<input class="input" id="caDate" type="date" value="' + esc(A.date) + '"></label>' +
       '<label class="field">Start times (UK)<input class="input" id="caTimes" placeholder="e.g. 13:00, 14:00, 15:30" value="' + esc(A.times) + '"></label>' +
       '<label class="field">Length<select class="input" id="caMins">' + ["20", "30", "45", "60"].map(function (m) { return "<option value=\"" + m + "\"" + (A.mins === m ? " selected" : "") + ">" + m + " mins</option>"; }).join("") + "</select></label>" +
       '<label class="field">Call link (optional)<input class="input" id="caLink" placeholder="Your Zoom link" value="' + esc(A.link) + '"></label></div>' +
-      '<div><button class="btn btn-metal" id="caAdd">Add times</button></div></section>' +
+      '<div><button class="btn btn-metal" id="caAdd">Add times</button></div></section>')) +
       '<div class="eyebrow">COMING UP (' + upcoming.length + ")</div>" +
       (upcoming.length ? upcoming.map(function (c) { return callCard(c, "upcoming"); }).join("") : '<div class="card pad note" style="text-align:center">No calls booked yet.</div>') +
       '<div class="eyebrow">NEEDS A RECORDING (' + waiting.length + ")</div>" +
       (waiting.length ? waiting.map(function (c) { return callCard(c, "waiting"); }).join("") : '<div class="card pad note" style="text-align:center">Nothing waiting.</div>') +
-      '<div class="eyebrow">OPEN TIMES (' + open.length + ")</div>" +
-      '<section class="card pad">' + (open.length ? '<div class="chips">' + open.map(function (s) { return '<span class="chip" style="display:inline-flex;gap:8px;align-items:center">' + esc(when(s.at)) + " · " + esc(s.mins || 30) + 'm<button type="button" data-crm="' + esc(s.id) + '" aria-label="Remove this time" style="border:none;background:none;color:inherit;cursor:pointer;font-size:15px;line-height:1">×</button></span>'; }).join("") + "</div>" : '<div class="note">No open times. Add some above.</div>') + "</section>" +
+      (calUrl() && !open.length ? "" : '<div class="eyebrow">OPEN TIMES (' + open.length + ")</div>" +
+      '<section class="card pad">' + (open.length ? '<div class="chips">' + open.map(function (s) { return '<span class="chip" style="display:inline-flex;gap:8px;align-items:center">' + esc(when(s.at)) + " · " + esc(s.mins || 30) + 'm<button type="button" data-crm="' + esc(s.id) + '" aria-label="Remove this time" style="border:none;background:none;color:inherit;cursor:pointer;font-size:15px;line-height:1">×</button></span>'; }).join("") + "</div>" : '<div class="note">No open times. Add some above.</div>') + "</section>") +
       '<div class="eyebrow">DONE (' + done.length + ")</div>" +
       (done.length ? done.map(function (c) { return callCard(c, "done"); }).join("") : '<div class="card pad note" style="text-align:center">No recordings uploaded yet.</div>');
   }

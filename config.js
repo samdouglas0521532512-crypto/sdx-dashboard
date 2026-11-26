@@ -5,6 +5,8 @@ window.SDX_CONFIG = {
   TELEGRAM_BOT: "SDXtradeFeedbot",
   AUTH_URL: "https://sdxtradefeed.onrender.com",
   ELITE_PACK_URL: "https://www.sdxtrading.education/",
+  // Your Calendly booking page, e.g. "https://calendly.com/sdx/1-1-call". Leave empty to use the times you add in Admin.
+  CALENDLY_URL: "",
   // Only these logins see the Mech Model groups on the Trade Service page
   OWNER_EMAILS: ["samdouglas@sdtradingeducation.com"]
 };
